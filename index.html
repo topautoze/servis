@@ -1,0 +1,1516 @@
+﻿<!DOCTYPE html>
+<html lang="bs">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top Auto - Upravljanje Radionicom</title>
+    <meta name="description" content="Top Auto - Sistem za upravljanje auto radionicom">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        :root {
+            --bg: #0a0e17;
+            --bg2: #111827;
+            --bg3: #1e293b;
+            --bg4: #273549;
+            --glass: rgba(30, 41, 59, .7);
+            --glass2: rgba(30, 41, 59, .4);
+            --accent: #3b82f6;
+            --accent2: #60a5fa;
+            --accent-g: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            --green: #10b981;
+            --red: #ef4444;
+            --yellow: #f59e0b;
+            --orange: #f97316;
+            --text: #f1f5f9;
+            --text2: #94a3b8;
+            --text3: #64748b;
+            --border: rgba(148, 163, 184, .15);
+            --r: 12px;
+            --shadow: 0 8px 32px rgba(0, 0, 0, .3)
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden
+        }
+
+        #app {
+            display: flex;
+            min-height: 100vh
+        }
+
+        #sidebar {
+            width: 260px;
+            background: var(--bg2);
+            border-right: 1px solid var(--border);
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+            transition: transform .3s
+        }
+
+        .sidebar-logo {
+            padding: 8px 24px 32px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 12px
+        }
+
+        .sidebar-logo h1 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            background: var(--accent-g);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent
+        }
+
+        .sidebar-logo p {
+            font-size: .75rem;
+            color: var(--text3);
+            margin-top: 2px
+        }
+
+        .nav-items {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 12px
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 11px 16px;
+            border-radius: var(--r);
+            cursor: pointer;
+            color: var(--text2);
+            font-size: .875rem;
+            font-weight: 500;
+            transition: all .2s;
+            margin-bottom: 2px
+        }
+
+        .nav-item:hover {
+            background: var(--glass2);
+            color: var(--text)
+        }
+
+        .nav-item.active {
+            background: var(--accent-g);
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(59, 130, 246, .3)
+        }
+
+        .nav-item i {
+            width: 20px;
+            text-align: center;
+            font-size: 1rem
+        }
+
+        .nav-version {
+            padding: 16px 24px;
+            text-align: center;
+            font-size: .7rem;
+            color: var(--text3);
+            border-top: 1px solid var(--border)
+        }
+
+        #main-content {
+            margin-left: 260px;
+            flex: 1;
+            padding: 28px 32px;
+            min-height: 100vh
+        }
+
+        .page {
+            display: none;
+            animation: fadeIn .3s ease
+        }
+
+        .page.active {
+            display: block
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+            gap: 12px
+        }
+
+        .page-header h2 {
+            font-size: 1.6rem;
+            font-weight: 700
+        }
+
+        .page-header h2 i {
+            margin-right: 8px;
+            background: var(--accent-g);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent
+        }
+
+        .btn {
+            padding: 9px 20px;
+            border-radius: var(--r);
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: .85rem;
+            font-weight: 600;
+            transition: all .2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .btn-primary {
+            background: var(--accent-g);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, .25)
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, .4)
+        }
+
+        .btn-secondary {
+            background: var(--bg3);
+            color: var(--text);
+            border: 1px solid var(--border)
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg4)
+        }
+
+        .btn-success {
+            background: var(--green);
+            color: #fff
+        }
+
+        .btn-danger {
+            background: var(--red);
+            color: #fff
+        }
+
+        .btn-sm {
+            padding: 6px 14px;
+            font-size: .78rem
+        }
+
+        .stat-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px
+        }
+
+        .stat-card {
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            padding: 20px;
+            transition: all .3s;
+            position: relative;
+            overflow: hidden
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(59, 130, 246, .3)
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            border-radius: var(--r) var(--r) 0 0
+        }
+
+        .stat-card:nth-child(1)::before {
+            background: var(--accent-g)
+        }
+
+        .stat-card:nth-child(2)::before {
+            background: linear-gradient(135deg, var(--green), #34d399)
+        }
+
+        .stat-card:nth-child(3)::before {
+            background: linear-gradient(135deg, var(--yellow), var(--orange))
+        }
+
+        .stat-card:nth-child(4)::before {
+            background: linear-gradient(135deg, var(--red), #f97316)
+        }
+
+        .stat-label {
+            font-size: .78rem;
+            color: var(--text3);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: .5px
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin: 6px 0 2px
+        }
+
+        .stat-sub {
+            font-size: .78rem;
+            color: var(--text2)
+        }
+
+        .card {
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            padding: 22px;
+            margin-bottom: 20px
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .card-title i {
+            color: var(--accent2)
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 16px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            color: var(--text);
+            font-family: inherit;
+            font-size: .85rem;
+            outline: none;
+            transition: border-color .2s
+        }
+
+        .search-input:focus {
+            border-color: var(--accent)
+        }
+
+        select.search-input {
+            cursor: pointer
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: var(--r)
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse
+        }
+
+        th {
+            background: var(--bg3);
+            padding: 12px 14px;
+            text-align: left;
+            font-size: .78rem;
+            font-weight: 600;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            white-space: nowrap
+        }
+
+        td {
+            padding: 11px 14px;
+            border-bottom: 1px solid var(--border);
+            font-size: .85rem;
+            white-space: nowrap
+        }
+
+        tr:hover td {
+            background: rgba(59, 130, 246, .04)
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: .72rem;
+            font-weight: 600;
+            display: inline-block
+        }
+
+        .badge-green {
+            background: rgba(16, 185, 129, .15);
+            color: #34d399
+        }
+
+        .badge-yellow {
+            background: rgba(245, 158, 11, .15);
+            color: #fbbf24
+        }
+
+        .badge-red {
+            background: rgba(239, 68, 68, .15);
+            color: #f87171
+        }
+
+        .badge-blue {
+            background: rgba(59, 130, 246, .15);
+            color: #60a5fa
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, .6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center
+        }
+
+        .modal-overlay.active {
+            display: flex
+        }
+
+        .modal {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 85vh;
+            overflow-y: auto;
+            animation: modalIn .2s ease
+        }
+
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(.95)
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1)
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px
+        }
+
+        .modal-header h3 {
+            font-size: 1.15rem;
+            font-weight: 700
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text3);
+            font-size: 1.3rem;
+            cursor: pointer;
+            padding: 4px
+        }
+
+        .form-group {
+            margin-bottom: 14px
+        }
+
+        .form-group label {
+            display: block;
+            font-size: .8rem;
+            font-weight: 600;
+            color: var(--text2);
+            margin-bottom: 5px
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 9px 14px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: .85rem;
+            outline: none;
+            transition: border-color .2s
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: var(--accent)
+        }
+
+        .form-group textarea {
+            min-height: 70px;
+            resize: vertical
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px
+        }
+
+        .chart-container {
+            position: relative;
+            height: 280px;
+            margin-top: 10px
+        }
+
+        .reminder-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px;
+            background: var(--bg3);
+            border-radius: var(--r);
+            margin-bottom: 8px;
+            transition: all .2s;
+            border-left: 3px solid var(--accent)
+        }
+
+        .reminder-item.urgent {
+            border-left-color: var(--red)
+        }
+
+        .reminder-item.soon {
+            border-left-color: var(--yellow)
+        }
+
+        .reminder-item .ri-info {
+            flex: 1
+        }
+
+        .reminder-item .ri-title {
+            font-weight: 600;
+            font-size: .9rem
+        }
+
+        .reminder-item .ri-sub {
+            font-size: .78rem;
+            color: var(--text3);
+            margin-top: 2px
+        }
+
+        .reminder-item .ri-date {
+            font-size: .78rem;
+            color: var(--text2);
+            font-weight: 600;
+            text-align: right;
+            min-width: 90px
+        }
+
+        .worker-card {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            padding: 18px;
+            text-align: center;
+            transition: all .3s
+        }
+
+        .worker-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(59, 130, 246, .3)
+        }
+
+        .worker-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--accent-g);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
+            margin: 0 auto 10px
+        }
+
+        .worker-name {
+            font-weight: 700;
+            font-size: 1rem
+        }
+
+        .worker-stat {
+            font-size: .78rem;
+            color: var(--text3);
+            margin-top: 4px
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            background: var(--bg3);
+            padding: 4px;
+            border-radius: var(--r);
+            width: fit-content
+        }
+
+        .tab {
+            padding: 8px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: .82rem;
+            font-weight: 600;
+            color: var(--text3);
+            transition: all .2s
+        }
+
+        .tab.active {
+            background: var(--accent-g);
+            color: #fff
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px 20px;
+            color: var(--text3)
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 12px;
+            opacity: .4
+        }
+
+        .empty-state p {
+            font-size: .9rem
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 14px 22px;
+            border-radius: var(--r);
+            color: #fff;
+            font-size: .85rem;
+            font-weight: 500;
+            z-index: 2000;
+            animation: toastIn .3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: var(--shadow)
+        }
+
+        .toast-success {
+            background: var(--green)
+        }
+
+        .toast-error {
+            background: var(--red)
+        }
+
+        .toast-info {
+            background: var(--accent)
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .hamburger {
+            display: none;
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 200;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            cursor: pointer;
+            color: var(--text)
+        }
+
+        .ocr-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--r);
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all .2s;
+            margin-bottom: 14px
+        }
+
+        .ocr-zone:hover {
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, .05)
+        }
+
+        .ocr-zone i {
+            font-size: 2rem;
+            color: var(--text3);
+            margin-bottom: 8px
+        }
+
+        .vehicle-profile-header {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap
+        }
+
+        .vehicle-plate {
+            background: var(--accent-g);
+            padding: 14px 28px;
+            border-radius: var(--r);
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: 2px
+        }
+
+        .vehicle-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px
+        }
+
+        .vehicle-info-item {
+            background: var(--bg3);
+            padding: 12px;
+            border-radius: 8px
+        }
+
+        .vehicle-info-item label {
+            font-size: .72rem;
+            color: var(--text3);
+            text-transform: uppercase;
+            letter-spacing: .5px
+        }
+
+        .vehicle-info-item span {
+            display: block;
+            font-weight: 600;
+            margin-top: 2px;
+            font-size: .95rem
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: var(--bg3);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 6px
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: var(--accent-g);
+            transition: width .5s ease
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg4);
+            border-radius: 3px
+        }
+
+        @media(max-width:768px) {
+            #sidebar {
+                transform: translateX(-100%)
+            }
+
+            #sidebar.open {
+                transform: translateX(0)
+            }
+
+            #main-content {
+                margin-left: 0;
+                padding: 16px
+            }
+
+            .hamburger {
+                display: block
+            }
+
+            .form-row {
+                grid-template-columns: 1fr
+            }
+
+            .stat-cards {
+                grid-template-columns: 1fr 1fr
+            }
+
+            .modal {
+                width: 95%;
+                padding: 20px
+            }
+        }
+
+        .img-gallery {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px
+        }
+
+        .img-gallery-item {
+            width: 100px;
+            height: 100px;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            border: 1px solid var(--border);
+            cursor: pointer
+        }
+
+        .img-gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover
+        }
+
+        .img-gallery-item .img-remove {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: var(--red);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            font-size: .7rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity .2s
+        }
+
+        .img-gallery-item:hover .img-remove {
+            opacity: 1
+        }
+
+        .img-lightbox {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, .85);
+            z-index: 3000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer
+        }
+
+        .img-lightbox img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 8px;
+            box-shadow: 0 0 40px rgba(0, 0, 0, .5)
+        }
+    </style>
+</head>
+
+<body>
+    <div id="topauto-app-wrapper">
+        <div id="app">
+            <nav id="sidebar"></nav>
+            <main id="main-content"></main>
+        </div>
+        <div id="topauto-loader" style="color:white; text-align:center; padding:50px; font-family:sans-serif;">
+            <i class="fas fa-spinner fa-spin"></i> Učitavanje Top Auto aplikacije...
+        </div>
+    </div>
+    <script>
+        // WordPress Fix: Ensure everything runs after DOM is ready
+        document.addEventListener('DOMContentLoaded', function () {
+            try {
+                const loader = document.getElementById('topauto-loader');
+                if (loader) loader.style.display = 'none';
+
+                if (typeof DB !== 'undefined') {
+                    DB.init();
+                    renderSidebar();
+                    initPages();
+                    navigate('dashboard');
+                } else {
+                    console.error("Top Auto: Scripts not loaded properly.");
+                }
+            } catch (e) {
+                console.error("Top Auto Inicijalizacija Error:", e);
+                document.getElementById('topauto-app-wrapper').innerHTML = `<div style="color:red;padding:20px;background:#1a1a1a;border-radius:8px">Greška pri pokretanju aplikacije. Provjerite konzolu pregledača (F12).<br>Detalji: ${e.message}</div>`;
+            }
+        });
+        // ===== DATA LAYER =====
+        const DB = { get(k) { try { return JSON.parse(localStorage.getItem('ta_' + k)) || null } catch (e) { return null } }, set(k, v) { localStorage.setItem('ta_' + k, JSON.stringify(v)) }, init() { if (!this.get('vehicles')) this.set('vehicles', []); if (!this.get('workers')) this.set('workers', [{ id: 'w1', name: 'Dragan', phone: '', spec: 'Mehanika', active: true }, { id: 'w2', name: 'Sadmir', phone: '', spec: 'Elektrika', active: true }]); if (!this.get('expenses')) this.set('expenses', []); if (!this.get('reminders')) this.set('reminders', []) } };
+        DB.init();
+        function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5) }
+        function fmt(n) { return new Intl.NumberFormat('bs-BA', { style: 'currency', currency: 'BAM' }).format(n) }
+        function fmtDate(d) { if (!d) return '-'; return new Date(d).toLocaleDateString('bs-BA') }
+        function toast(msg, type = 'success') { const t = document.createElement('div'); t.className = 'toast toast-' + type; t.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : 'info-circle') + '"></i>' + msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3000) }
+        function getVehicles() { return DB.get('vehicles') || [] }
+        function saveVehicles(v) { DB.set('vehicles', v) }
+        function getWorkers() { return DB.get('workers') || [] }
+        function saveWorkers(w) { DB.set('workers', w) }
+        function getExpenses() { return DB.get('expenses') || [] }
+        function saveExpenses(e) { DB.set('expenses', e) }
+        function getReminders() { return DB.get('reminders') || [] }
+        function saveReminders(r) { DB.set('reminders', r) }
+
+        // ===== NAVIGATION =====
+        const pages = ['dashboard', 'vehicles', 'finances', 'reminders', 'workers', 'settings'];
+        const pageIcons = ['fa-gauge-high', 'fa-car', 'fa-chart-line', 'fa-bell', 'fa-users', 'fa-gear'];
+        const pageNames = ['Kontrolna Ploča', 'Vozila', 'Finansije', 'Podsjetnici', 'Radnici', 'Postavke'];
+
+        function renderSidebar() {
+            const sb = document.getElementById('sidebar');
+            sb.innerHTML = `<div class="sidebar-logo"><h1><i class="fas fa-car-side"></i> Top Auto</h1><p>Upravljanje Radionicom</p></div><div class="nav-items">${pages.map((p, i) => `<div class="nav-item${p === 'dashboard' ? ' active' : ''}" data-page="${p}"><i class="fas ${pageIcons[i]}"></i>${pageNames[i]}</div>`).join('')}</div><div class="nav-version">Top Auto v1.0 © 2026</div>`;
+            sb.querySelectorAll('.nav-item').forEach(n => n.onclick = () => navigate(n.dataset.page));
+            document.body.insertAdjacentHTML('afterbegin', '<div class="hamburger" onclick="document.getElementById(\'sidebar\').classList.toggle(\'open\')"><i class="fas fa-bars"></i></div>');
+        }
+
+        function navigate(page, data) {
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            const el = document.getElementById('page-' + page);
+            if (el) { el.classList.add('active') }
+            if (page === 'dashboard') renderDashboard();
+            else if (page === 'vehicles') renderVehicles(data);
+            else if (page === 'finances') renderFinances();
+            else if (page === 'reminders') renderRemindersPage();
+            else if (page === 'workers') renderWorkers();
+            else if (page === 'settings') renderSettings();
+            document.getElementById('sidebar').classList.remove('open');
+        }
+
+        function initPages() {
+            const mc = document.getElementById('main-content');
+            mc.innerHTML = pages.map(p => `<div class="page" id="page-${p}"></div>`).join('') + '<div id="modal-root"></div>';
+        }
+
+        // ===== DASHBOARD =====
+        function renderDashboard() {
+            const vehicles = getVehicles(), workers = getWorkers();
+            let totalRepairs = 0, totalEarned = 0, totalSpentParts = 0, activeRepairs = 0;
+            vehicles.forEach(v => (v.repairs || []).forEach(r => { totalRepairs++; totalEarned += Number(r.charged || 0); totalSpentParts += Number(r.partsCost || 0); if (r.status === 'active') activeRepairs++; }));
+            const expenses = getExpenses();
+            const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+            const netProfit = totalEarned - totalSpentParts - totalExpenses;
+            const pg = document.getElementById('page-dashboard');
+            const recentRepairs = [];
+            vehicles.forEach(v => (v.repairs || []).forEach(r => recentRepairs.push({ ...r, plate: v.plate, owner: v.owner, images: v.images })));
+            recentRepairs.sort((a, b) => new Date(b.date) - new Date(a.date));
+            const recent5 = recentRepairs.slice(0, 7);
+            const reminders = getReminders().filter(r => !r.completed).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate)).slice(0, 5);
+
+            pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-gauge-high"></i>Kontrolna Ploča</h2><div><span style="color:var(--text3);font-size:.82rem">${new Date().toLocaleDateString('bs-BA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span></div></div>
+<div class="stat-cards">
+<div class="stat-card"><div class="stat-label">Ukupno Popravki</div><div class="stat-value">${totalRepairs}</div><div class="stat-sub">${activeRepairs} aktivnih</div></div>
+<div class="stat-card"><div class="stat-label">Ukupna Zarada</div><div class="stat-value">${fmt(totalEarned)}</div><div class="stat-sub">Prihod od popravki</div></div>
+<div class="stat-card"><div class="stat-label">Neto Profit</div><div class="stat-value">${fmt(netProfit)}</div><div class="stat-sub">Nakon troškova</div></div>
+<div class="stat-card"><div class="stat-label">Vozila u Bazi</div><div class="stat-value">${vehicles.length}</div><div class="stat-sub">${workers.length} radnika</div></div>
+</div>
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:20px">
+<div class="card"><div class="card-title"><i class="fas fa-clock"></i>Posljednje Popravke</div>
+${recent5.length ? `<div class="table-wrap"><table><thead><tr><th>Slika</th><th>Datum</th><th>Tablica</th><th>Vlasnik</th><th>Opis</th><th>Naplaćeno</th><th>Status</th></tr></thead><tbody>${recent5.map(r => {
+                const thumb = r.images && r.images.length ? r.images[0] : null;
+                return `<tr><td>${thumb ? `<img src="${thumb}" style="width:40px;height:28px;border-radius:4px;object-fit:cover;border:1px solid var(--border)">` : `<div style="width:40px;height:28px;border-radius:4px;background:var(--card);display:flex;align-items:center;justify-content:center;border:1px solid var(--border)"><i class="fas fa-car" style="font-size:0.7rem;color:var(--text3)"></i></div>`}</td><td>${fmtDate(r.date)}</td><td><strong>${r.plate || '-'}</strong></td><td>${r.owner || '-'}</td><td>${(r.description || '').substring(0, 30)}</td><td>${fmt(r.charged || 0)}</td><td><span class="badge badge-${r.status === 'done' ? 'green' : r.status === 'active' ? 'yellow' : 'blue'}">${r.status === 'done' ? 'Završeno' : r.status === 'active' ? 'U toku' : 'Čeka'}</span></td></tr>`
+            }).join('')}</tbody></table></div>` : '<div class="empty-state"><i class="fas fa-wrench"></i><p>Nema popravki. Dodajte prvo vozilo.</p></div>'}
+</div>
+<div class="card"><div class="card-title"><i class="fas fa-bell"></i>Nadolazeći Podsjetnici</div>
+${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = new Date(), diff = Math.ceil((d - now) / (1000 * 60 * 60 * 24)); const cls = diff < 0 ? 'urgent' : diff < 7 ? 'soon' : ''; return `<div class="reminder-item ${cls}"><div class="ri-info"><div class="ri-title">${r.title}</div><div class="ri-sub">${r.vehiclePlate || 'Opće'}</div></div><div class="ri-date">${diff < 0 ? 'Isteklo!' : diff === 0 ? 'Danas' : diff + ' dana'}</div></div>` }).join('') : '<div class="empty-state"><i class="fas fa-bell-slash"></i><p>Nema podsjetnika</p></div>'}
+</div></div>
+<div class="card" style="margin-top:20px"><div class="card-title"><i class="fas fa-chart-bar"></i>Mjesečna Zarada (zadnjih 6 mjeseci)</div><div class="chart-container"><canvas id="dashChart"></canvas></div></div>`;
+            renderDashChart(recentRepairs);
+        }
+
+        function renderDashChart(repairs) {
+            const canvas = document.getElementById('dashChart'); if (!canvas) return;
+            const months = []; const now = new Date();
+            for (let i = 5; i >= 0; i--) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); months.push({ label: d.toLocaleDateString('bs-BA', { month: 'short', year: '2-digit' }), m: d.getMonth(), y: d.getFullYear() }); }
+            const earned = months.map(m => repairs.filter(r => { const d = new Date(r.date); return d.getMonth() === m.m && d.getFullYear() === m.y }).reduce((s, r) => s + Number(r.charged || 0), 0));
+            const costs = months.map(m => repairs.filter(r => { const d = new Date(r.date); return d.getMonth() === m.m && d.getFullYear() === m.y }).reduce((s, r) => s + Number(r.partsCost || 0), 0));
+            new Chart(canvas, { type: 'bar', data: { labels: months.map(m => m.label), datasets: [{ label: 'Zarada', data: earned, backgroundColor: 'rgba(59,130,246,.7)', borderRadius: 6 }, { label: 'Troškovi Dijelova', data: costs, backgroundColor: 'rgba(239,68,68,.5)', borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,.08)' } }, y: { ticks: { color: '#64748b', callback: v => fmt(v) }, grid: { color: 'rgba(148,163,184,.08)' } } } } });
+        }
+
+        // ===== VEHICLES =====
+        function renderVehicles(viewId) {
+            if (viewId) return renderVehicleProfile(viewId);
+            const vehicles = getVehicles();
+            const pg = document.getElementById('page-vehicles');
+            pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-car"></i>Vozila</h2><button class="btn btn-primary" onclick="openVehicleModal()"><i class="fas fa-plus"></i>Novo Vozilo</button></div>
+<div class="search-box"><input class="search-input" id="vSearch" placeholder="Pretraži po tablici, broju registracije ili imenu..." oninput="filterVehicles()"><select class="search-input" style="flex:0 0 180px" id="vSort" onchange="filterVehicles()"><option value="recent">Najnovije</option><option value="name">Po Imenu</option><option value="plate">Po Tablici</option></select></div>
+<div id="vehiclesList">${renderVehicleTable(vehicles)}</div>`;
+        }
+
+        function renderVehicleTable(vehicles) {
+            if (!vehicles.length) return '<div class="empty-state"><i class="fas fa-car"></i><p>Nema vozila u bazi. Kliknite "Novo Vozilo" da dodate.</p></div>';
+            return `<div class="table-wrap"><table><thead><tr><th>Slika</th><th>Tablica</th><th>Vlasnik</th><th>Vozilo</th><th>Br. Registracije</th><th>Popravke</th><th>Ukupno Naplaćeno</th><th>Akcije</th></tr></thead><tbody>${vehicles.map(v => {
+                const rc = (v.repairs || []).length;
+                const tot = (v.repairs || []).reduce((s, r) => s + Number(r.charged || 0), 0);
+                const thumb = v.images && v.images.length ? v.images[0] : null;
+                return `<tr style="cursor:pointer" onclick="navigate('vehicles','${v.id}')"><td>${thumb ? `<img src="${thumb}" style="width:50px;height:35px;border-radius:4px;object-fit:cover;border:1px solid var(--border)">` : `<div style="width:50px;height:35px;border-radius:4px;background:var(--card);display:flex;align-items:center;justify-content:center;border:1px solid var(--border)"><i class="fas fa-car" style="font-size:0.8rem;color:var(--text3)"></i></div>`}</td><td><strong>${v.plate}</strong></td><td>${v.owner}</td><td>${v.make} ${v.model} ${v.year || ''}</td><td>${v.regNumber || '-'}</td><td><span class="badge badge-blue">${rc}</span></td><td>${fmt(tot)}</td><td><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openVehicleModal('${v.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteVehicle('${v.id}')"><i class="fas fa-trash"></i></button></td></tr>`
+            }).join('')}</tbody></table></div>`;
+        }
+
+        function filterVehicles() {
+            const q = document.getElementById('vSearch').value.toLowerCase();
+            const sort = document.getElementById('vSort').value;
+            let vehicles = getVehicles().filter(v => (v.plate + ' ' + v.owner + ' ' + (v.regNumber || '') + ' ' + v.make + ' ' + v.model).toLowerCase().includes(q));
+            if (sort === 'name') vehicles.sort((a, b) => a.owner.localeCompare(b.owner));
+            else if (sort === 'plate') vehicles.sort((a, b) => a.plate.localeCompare(b.plate));
+            else vehicles.sort((a, b) => b.createdAt - a.createdAt);
+            document.getElementById('vehiclesList').innerHTML = renderVehicleTable(vehicles);
+        }
+
+        function openVehicleModal(editId) {
+            const v = editId ? getVehicles().find(x => x.id === editId) : null;
+            const workers = getWorkers().filter(w => w.active);
+            showModal(`${v ? 'Uredi' : 'Novo'} Vozilo`, `
+<div class="ocr-zone" onclick="document.getElementById('ocrInput').click()"><i class="fas fa-camera"></i><p style="color:var(--text3);font-size:.82rem">Kliknite za sliku tablice/registracije (OCR)</p><input type="file" id="ocrInput" accept="image/*" capture="environment" style="display:none" onchange="handleOCR(this)"></div>
+<div class="form-row"><div class="form-group"><label>Registarska Tablica *</label><input id="fPlate" value="${v ? v.plate : ''}" placeholder="npr. A12-B-345"></div><div class="form-group"><label>Broj Registracije</label><input id="fReg" value="${v ? v.regNumber || '' : ''}" placeholder="Broj iz saobraćajne"></div></div>
+<div class="form-group"><label>Vlasnik *</label><input id="fOwner" value="${v ? v.owner : ''}" placeholder="Ime i prezime"></div>
+<div class="form-row"><div class="form-group"><label>Telefon</label><input id="fPhone" value="${v ? v.phone || '' : ''}" placeholder="06x xxx xxx"></div><div class="form-group"><label>Email</label><input id="fEmail" value="${v ? v.email || '' : ''}" placeholder="email@primjer.com"></div></div>
+<div class="form-row"><div class="form-group"><label>Marka *</label><input id="fMake" value="${v ? v.make : ''}" placeholder="npr. Volkswagen"></div><div class="form-group"><label>Model *</label><input id="fModel" value="${v ? v.model : ''}" placeholder="npr. Golf 7"></div></div>
+<div class="form-row"><div class="form-group"><label>Godina</label><input type="number" id="fYear" value="${v ? v.year || '' : ''}" placeholder="2020"></div><div class="form-group"><label>Kilometraža</label><input type="number" id="fKm" value="${v ? v.km || '' : ''}" placeholder="150000"></div></div>
+<div class="form-group"><label>Slike Vozila</label><input type="file" id="fImages" accept="image/*" multiple onchange="handleVehicleImages(this)"><div class="img-gallery" id="fImgPreview">${v && v.images ? v.images.map((img, i) => '<div class="img-gallery-item"><img src="' + img + '"><button class="img-remove" onclick="removePreviewImg(' + i + ')"><i class="fas fa-times"></i></button></div>').join('') : ''}</div></div>
+<div class="form-group"><label>Napomene</label><textarea id="fNotes" placeholder="Dodatne bilješke...">${v ? v.notes || '' : ''}</textarea></div>
+`, () => {
+                const plate = document.getElementById('fPlate').value.trim();
+                const owner = document.getElementById('fOwner').value.trim();
+                const make = document.getElementById('fMake').value.trim();
+                const model = document.getElementById('fModel').value.trim();
+                if (!plate || !owner || !make || !model) { toast('Popunite obavezna polja!', 'error'); return false }
+                const vehicles = getVehicles();
+                const imgData = window._vehicleImages || (v ? v.images : null) || [];
+                if (v) { const idx = vehicles.findIndex(x => x.id === v.id); vehicles[idx] = { ...vehicles[idx], plate, owner, make, model, regNumber: document.getElementById('fReg').value.trim(), phone: document.getElementById('fPhone').value.trim(), email: document.getElementById('fEmail').value.trim(), year: document.getElementById('fYear').value, km: document.getElementById('fKm').value, notes: document.getElementById('fNotes').value, images: imgData }; }
+                else { vehicles.push({ id: uid(), plate, owner, make, model, regNumber: document.getElementById('fReg').value.trim(), phone: document.getElementById('fPhone').value.trim(), email: document.getElementById('fEmail').value.trim(), year: document.getElementById('fYear').value, km: document.getElementById('fKm').value, notes: document.getElementById('fNotes').value, images: imgData, repairs: [], createdAt: Date.now() }); }
+                window._vehicleImages = null;
+                saveVehicles(vehicles); toast(v ? 'Vozilo ažurirano!' : 'Vozilo dodano!'); renderVehicles(); return true;
+            });
+        }
+
+        function deleteVehicle(id) { if (!confirm('Obrisati ovo vozilo i sve popravke?')) return; const v = getVehicles().filter(x => x.id !== id); saveVehicles(v); toast('Vozilo obrisano!'); renderVehicles(); }
+
+        function handleOCR(input) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const img = new Image(); img.src = e.target.result;
+                img.onload = function () {
+                    const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
+                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
+                    toast('Slika učitana. OCR nije dostupan offline - unesite tablicu ručno.', 'info');
+                };
+            }; reader.readAsDataURL(file);
+        }
+
+        function handleVehicleImages(input) {
+            if (!input.files || !input.files.length) return;
+            window._vehicleImages = window._vehicleImages || [];
+            const gallery = document.getElementById('fImgPreview');
+            Array.from(input.files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    window._vehicleImages.push(e.target.result);
+                    const div = document.createElement('div'); div.className = 'img-gallery-item';
+                    div.innerHTML = '<img src="' + e.target.result + '"><button class="img-remove" onclick="this.parentElement.remove();window._vehicleImages.splice(' + window._vehicleImages.length + ',1)"><i class="fas fa-times"></i></button>';
+                    gallery.appendChild(div);
+                }; reader.readAsDataURL(file);
+            });
+        }
+        function removePreviewImg(idx) {
+            const gallery = document.getElementById('fImgPreview');
+            if (gallery.children[idx]) gallery.children[idx].remove();
+            if (window._vehicleImages) window._vehicleImages.splice(idx, 1);
+        }
+        function showLightbox(src) {
+            const lb = document.createElement('div'); lb.className = 'img-lightbox';
+            lb.innerHTML = '<img src="' + src + '">'; lb.onclick = () => lb.remove();
+            document.body.appendChild(lb);
+        }
+
+        // ===== VEHICLE PROFILE =====
+        function renderVehicleProfile(id) {
+            const vehicles = getVehicles(); const v = vehicles.find(x => x.id === id);
+            if (!v) { renderVehicles(); return }
+            const repairs = (v.repairs || []).sort((a, b) => new Date(b.date) - new Date(a.date));
+            const totalCharged = repairs.reduce((s, r) => s + Number(r.charged || 0), 0);
+            const totalParts = repairs.reduce((s, r) => s + Number(r.partsCost || 0), 0);
+            const pg = document.getElementById('page-vehicles');
+            const vImages = (v.images || []);
+            pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-arrow-left" style="cursor:pointer" onclick="renderVehicles()"></i> Profil Vozila</h2><div><button class="btn btn-secondary" onclick="openVehicleModal('${v.id}')"><i class="fas fa-edit"></i>Uredi Vozilo</button> <button class="btn btn-primary" onclick="openRepairModal('${v.id}')"><i class="fas fa-plus"></i>Nova Popravka</button> <button class="btn btn-secondary" onclick="openReminderModalForVehicle('${v.id}','${v.plate}')"><i class="fas fa-bell"></i>Podsjetnik</button></div></div>
+<div class="vehicle-profile-header"><div class="vehicle-plate">${v.plate}</div><div><h3>${v.owner}</h3><p style="color:var(--text3)">${v.make} ${v.model} ${v.year || ''} ${v.km ? '• ' + Number(v.km).toLocaleString() + ' km' : ''}</p><p style="color:var(--text3);font-size:.8rem">${v.phone || ''} ${v.email ? '• ' + v.email : ''}</p></div></div>
+<div class="vehicle-info-grid">
+<div class="vehicle-info-item"><label>Br. Registracije</label><span>${v.regNumber || '-'}</span></div>
+<div class="vehicle-info-item"><label>Ukupno Popravki</label><span>${repairs.length}</span></div>
+<div class="vehicle-info-item"><label>Ukupno Naplaćeno</label><span>${fmt(totalCharged)}</span></div>
+<div class="vehicle-info-item"><label>Troškovi Dijelova</label><span>${fmt(totalParts)}</span></div>
+<div class="vehicle-info-item"><label>Profit od Vozila</label><span>${fmt(totalCharged - totalParts)}</span></div>
+<div class="vehicle-info-item"><label>Napomene</label><span>${v.notes || '-'}</span></div>
+</div>
+${vImages.length ? `<div class="card"><div class="card-title"><i class="fas fa-images"></i>Slike Vozila (${vImages.length})</div><div class="img-gallery">${vImages.map(img => '<div class="img-gallery-item" onclick="showLightbox(this.querySelector(\'img\').src)"><img src="' + img + '"></div>').join('')}</div></div>` : ''}
+<div class="card"><div class="card-title"><i class="fas fa-wrench"></i>Historija Popravki</div>
+${repairs.length ? `<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Opis</th><th>Radnik</th><th>Dijelovi</th><th>Cijena Dijelova</th><th>Rad</th><th>Naplaćeno</th><th>Status</th><th>Akcije</th></tr></thead><tbody>${repairs.map(r => `<tr><td>${fmtDate(r.date)}</td><td>${r.description || '-'}</td><td>${r.worker || '-'}</td><td>${r.partsUsed || '-'}</td><td>${fmt(r.partsCost || 0)}</td><td>${fmt(r.laborCost || 0)}</td><td><strong>${fmt(r.charged || 0)}</strong></td><td><span class="badge badge-${r.status === 'done' ? 'green' : r.status === 'active' ? 'yellow' : 'blue'}">${r.status === 'done' ? 'Završeno' : r.status === 'active' ? 'U toku' : 'Čeka'}</span></td><td><button class="btn btn-sm btn-secondary" onclick="openRepairModal('${v.id}','${r.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-sm btn-danger" onclick="deleteRepair('${v.id}','${r.id}')"><i class="fas fa-trash"></i></button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty-state"><i class="fas fa-tools"></i><p>Nema popravki za ovo vozilo.</p></div>'}
+</div>`;
+        }
+
+        function openRepairModal(vehicleId, repairId) {
+            const vehicles = getVehicles(); const v = vehicles.find(x => x.id === vehicleId); if (!v) return;
+            const r = repairId ? (v.repairs || []).find(x => x.id === repairId) : null;
+            const workers = getWorkers().filter(w => w.active);
+            const commonRepairs = ['Zamjena ulja i filtera', 'Zamjena kočnica', 'Zamjena remena', 'Servis klime', 'Zamjena akumulatora', 'Zamjena svjećica', 'Dijagnostika', 'Geometrija trapa', 'Zamjena amortizera', 'Zamjena kvačila', 'Popravka auspuha', 'Zamjena guma', 'Balansiranje', 'Zamjena diskova', 'Veliki servis'];
+            showModal(`${r ? 'Uredi' : 'Nova'} Popravka - ${v.plate}`, `
+<div class="form-group"><label>Datum *</label><input type="date" id="rDate" value="${r ? r.date : new Date().toISOString().split('T')[0]}"></div>
+<div class="form-group"><label>Opis Popravke *</label><textarea id="rDesc" placeholder="Opišite popravku...">${r ? r.description || '' : ''}</textarea><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${commonRepairs.map(c => `<span class="badge badge-blue" style="cursor:pointer" onclick="document.getElementById('rDesc').value+=this.textContent+'; '">${c}</span>`).join('')}</div></div>
+<div class="form-row"><div class="form-group"><label>Radnik</label><select id="rWorker"><option value="">-- Izaberi --</option>${workers.map(w => `<option value="${w.name}"${r && r.worker === w.name ? ' selected' : ''}>${w.name}</option>`).join('')}</select></div><div class="form-group"><label>Status</label><select id="rStatus"><option value="active"${r && r.status === 'active' ? ' selected' : ''}>U toku</option><option value="done"${r && r.status === 'done' ? ' selected' : ''}>Završeno</option><option value="waiting"${r && r.status === 'waiting' ? ' selected' : ''}>Čeka</option></select></div></div>
+<div class="form-group"><label>Korišteni Dijelovi</label><textarea id="rParts" placeholder="Npr: filter ulja, kočione plocice...">${r ? r.partsUsed || '' : ''}</textarea></div>
+<div class="form-row"><div class="form-group"><label>Cijena Dijelova (KM)</label><input type="number" id="rPartsCost" value="${r ? r.partsCost || 0 : 0}" step="0.01"></div><div class="form-group"><label>Cijena Rada (KM)</label><input type="number" id="rLabor" value="${r ? r.laborCost || 0 : 0}" step="0.01"></div></div>
+<div class="form-group"><label>Naplaćeno Klijentu (KM) *</label><input type="number" id="rCharged" value="${r ? r.charged || 0 : 0}" step="0.01"></div>
+`, () => {
+                const date = document.getElementById('rDate').value; const desc = document.getElementById('rDesc').value.trim(); const charged = document.getElementById('rCharged').value;
+                if (!date || !desc) { toast('Popunite datum i opis!', 'error'); return false }
+                const repair = { id: r ? r.id : uid(), date, description: desc, worker: document.getElementById('rWorker').value, status: document.getElementById('rStatus').value, partsUsed: document.getElementById('rParts').value, partsCost: Number(document.getElementById('rPartsCost').value) || 0, laborCost: Number(document.getElementById('rLabor').value) || 0, charged: Number(charged) || 0 };
+                const vehicles2 = getVehicles(); const vi = vehicles2.findIndex(x => x.id === vehicleId);
+                if (!vehicles2[vi].repairs) vehicles2[vi].repairs = [];
+                if (r) { const ri = vehicles2[vi].repairs.findIndex(x => x.id === r.id); vehicles2[vi].repairs[ri] = repair; }
+                else { vehicles2[vi].repairs.push(repair); }
+                saveVehicles(vehicles2); toast(r ? 'Popravka ažurirana!' : 'Popravka dodana!'); renderVehicleProfile(vehicleId); return true;
+            });
+        }
+
+        function deleteRepair(vId, rId) { if (!confirm('Obrisati ovu popravku?')) return; const v = getVehicles(); const vi = v.findIndex(x => x.id === vId); v[vi].repairs = v[vi].repairs.filter(r => r.id !== rId); saveVehicles(v); toast('Popravka obrisana!'); renderVehicleProfile(vId); }
+
+        // ===== FINANCES =====
+        function renderFinances() {
+            const pg = document.getElementById('page-finances');
+            const vehicles = getVehicles(); const expenses = getExpenses();
+            const allRepairs = []; vehicles.forEach(v => (v.repairs || []).forEach(r => allRepairs.push({ ...r, plate: v.plate, owner: v.owner })));
+            const totalEarned = allRepairs.reduce((s, r) => s + Number(r.charged || 0), 0);
+            const totalPartsCost = allRepairs.reduce((s, r) => s + Number(r.partsCost || 0), 0);
+            const totalLabor = allRepairs.reduce((s, r) => s + Number(r.laborCost || 0), 0);
+            const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+            const profit = totalEarned - totalPartsCost - totalExpenses;
+
+            pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-chart-line"></i>Finansije</h2><button class="btn btn-primary" onclick="openExpenseModal()"><i class="fas fa-plus"></i>Novi Trošak</button></div>
+<div class="stat-cards">
+<div class="stat-card"><div class="stat-label">Ukupna Zarada</div><div class="stat-value" style="color:#60a5fa">${fmt(totalEarned)}</div></div>
+<div class="stat-card"><div class="stat-label">Troškovi Dijelova</div><div class="stat-value" style="color:#fbbf24">${fmt(totalPartsCost)}</div></div>
+<div class="stat-card"><div class="stat-label">Ostali Troškovi</div><div class="stat-value" style="color:#f87171">${fmt(totalExpenses)}</div></div>
+<div class="stat-card"><div class="stat-label">Neto Profit</div><div class="stat-value" style="color:${profit >= 0 ? '#34d399' : '#f87171'}">${fmt(profit)}</div></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+<div class="card"><div class="card-title"><i class="fas fa-chart-pie"></i>Raspodjela Prihoda</div><div class="chart-container"><canvas id="finPieChart"></canvas></div></div>
+<div class="card"><div class="card-title"><i class="fas fa-chart-area"></i>Mjesečni Trend</div><div class="chart-container"><canvas id="finLineChart"></canvas></div></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+<div class="card"><div class="card-title"><i class="fas fa-wrench"></i>Zarada po Tipu Popravke</div><div class="chart-container"><canvas id="finRepairChart"></canvas></div></div>
+<div class="card"><div class="card-title"><i class="fas fa-users"></i>Zarada po Radniku</div><div class="chart-container"><canvas id="finWorkerChart"></canvas></div></div>
+</div>
+<div class="card"><div class="card-title"><i class="fas fa-receipt"></i>Troškovi Radionice</div>
+<div class="search-box"><input class="search-input" id="expSearch" placeholder="Pretraži troškove..." oninput="filterExpenses()"><select class="search-input" style="flex:0 0 160px" id="expCat" onchange="filterExpenses()"><option value="">Sve Kategorije</option><option value="Najam">Najam</option><option value="Struja">Struja</option><option value="Alat">Alat</option><option value="Materijal">Materijal</option><option value="Plata">Plata</option><option value="Ostalo">Ostalo</option></select></div>
+<div id="expensesList">${renderExpenseTable(expenses)}</div></div>`;
+            renderFinanceCharts(allRepairs, expenses);
+        }
+
+        function renderExpenseTable(expenses) {
+            if (!expenses.length) return '<div class="empty-state"><i class="fas fa-receipt"></i><p>Nema troškova</p></div>';
+            const sorted = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+            return `<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Kategorija</th><th>Opis</th><th>Iznos</th><th>Akcije</th></tr></thead><tbody>${sorted.map(e => `<tr><td>${fmtDate(e.date)}</td><td><span class="badge badge-yellow">${e.category}</span></td><td>${e.description}</td><td><strong>${fmt(e.amount)}</strong></td><td><button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')"><i class="fas fa-trash"></i></button></td></tr>`).join('')}</tbody></table></div>`;
+        }
+
+        function filterExpenses() {
+            const q = document.getElementById('expSearch').value.toLowerCase();
+            const cat = document.getElementById('expCat').value;
+            let exp = getExpenses().filter(e => (e.description + ' ' + e.category).toLowerCase().includes(q));
+            if (cat) exp = exp.filter(e => e.category === cat);
+            document.getElementById('expensesList').innerHTML = renderExpenseTable(exp);
+        }
+
+        function openExpenseModal() {
+            showModal('Novi Trošak', `
+<div class="form-group"><label>Datum *</label><input type="date" id="eDate" value="${new Date().toISOString().split('T')[0]}"></div>
+<div class="form-group"><label>Kategorija *</label><select id="eCat"><option value="Najam">Najam</option><option value="Struja">Struja/Voda/Grijanje</option><option value="Alat">Alat i Oprema</option><option value="Materijal">Potrošni Materijal</option><option value="Plata">Plata</option><option value="Ostalo">Ostalo</option></select></div>
+<div class="form-group"><label>Opis *</label><input id="eDesc" placeholder="Opis troška"></div>
+<div class="form-group"><label>Iznos (KM) *</label><input type="number" id="eAmount" step="0.01" placeholder="0.00"></div>
+`, () => { const d = document.getElementById('eDate').value; const desc = document.getElementById('eDesc').value.trim(); const amt = document.getElementById('eAmount').value; if (!d || !desc || !amt) { toast('Popunite sva polja!', 'error'); return false } const exp = getExpenses(); exp.push({ id: uid(), date: d, category: document.getElementById('eCat').value, description: desc, amount: Number(amt) }); saveExpenses(exp); toast('Trošak dodan!'); renderFinances(); return true; });
+        }
+
+        function deleteExpense(id) { if (!confirm('Obrisati ovaj trošak?')) return; saveExpenses(getExpenses().filter(e => e.id !== id)); toast('Trošak obrisan!'); renderFinances(); }
+
+        function renderFinanceCharts(repairs, expenses) {
+            // Pie chart
+            const pieCanvas = document.getElementById('finPieChart');
+            if (pieCanvas) {
+                const partsCost = repairs.reduce((s, r) => s + Number(r.partsCost || 0), 0);
+                const laborEarned = repairs.reduce((s, r) => s + Number(r.laborCost || 0), 0);
+                const totalExp = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+                const profit = repairs.reduce((s, r) => s + Number(r.charged || 0), 0) - partsCost - totalExp;
+                new Chart(pieCanvas, { type: 'doughnut', data: { labels: ['Profit', 'Troškovi Dijelova', 'Troškovi Radionice'], datasets: [{ data: [Math.max(0, profit), partsCost, totalExp], backgroundColor: ['rgba(16,185,129,.8)', 'rgba(245,158,11,.8)', 'rgba(239,68,68,.8)'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } } } } });
+            }
+            // Line chart
+            const lineCanvas = document.getElementById('finLineChart');
+            if (lineCanvas) {
+                const months = []; const now = new Date();
+                for (let i = 5; i >= 0; i--) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); months.push({ label: d.toLocaleDateString('bs-BA', { month: 'short', year: '2-digit' }), m: d.getMonth(), y: d.getFullYear() }); }
+                const earnedData = months.map(m => repairs.filter(r => { const d = new Date(r.date); return d.getMonth() === m.m && d.getFullYear() === m.y }).reduce((s, r) => s + Number(r.charged || 0), 0));
+                const expData = months.map(m => expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === m.m && d.getFullYear() === m.y }).reduce((s, e) => s + Number(e.amount || 0), 0));
+                new Chart(lineCanvas, { type: 'line', data: { labels: months.map(m => m.label), datasets: [{ label: 'Zarada', data: earnedData, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.1)', fill: true, tension: .4 }, { label: 'Troškovi', data: expData, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.1)', fill: true, tension: .4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,.08)' } }, y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,.08)' } } } } });
+            }
+            // Repair type chart
+            const repairCanvas = document.getElementById('finRepairChart');
+            if (repairCanvas) {
+                const types = {}; repairs.forEach(r => { const t = (r.description || 'Ostalo').split(';')[0].trim(); types[t] = (types[t] || 0) + Number(r.charged || 0) });
+                const sorted = Object.entries(types).sort((a, b) => b[1] - a[1]).slice(0, 8);
+                new Chart(repairCanvas, { type: 'bar', data: { labels: sorted.map(s => s[0].substring(0, 20)), datasets: [{ data: sorted.map(s => s[1]), backgroundColor: 'rgba(139,92,246,.7)', borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', callback: v => fmt(v) }, grid: { color: 'rgba(148,163,184,.08)' } }, y: { ticks: { color: '#94a3b8' }, grid: { display: false } } } } });
+            }
+            // Worker chart
+            const workerCanvas = document.getElementById('finWorkerChart');
+            if (workerCanvas) {
+                const wEarnings = {}; repairs.forEach(r => { const w = r.worker || 'Nepoznat'; wEarnings[w] = (wEarnings[w] || 0) + Number(r.charged || 0) });
+                const entries = Object.entries(wEarnings);
+                new Chart(workerCanvas, { type: 'doughnut', data: { labels: entries.map(e => e[0]), datasets: [{ data: entries.map(e => e[1]), backgroundColor: ['rgba(59,130,246,.8)', 'rgba(139,92,246,.8)', 'rgba(16,185,129,.8)', 'rgba(245,158,11,.8)', 'rgba(236,72,153,.8)'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } } } } });
+            }
+        }
+
+        // ===== REMINDERS =====
+        function renderRemindersPage() {
+            const pg = document.getElementById('page-reminders');
+            const reminders = getReminders().sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+            const active = reminders.filter(r => !r.completed);
+            const completed = reminders.filter(r => r.completed);
+            const vehicles = getVehicles();
+
+            const suggestedServices = [
+                { title: 'Zamjena motornog ulja', interval: 'Svakih 10.000 - 15.000 km ili godišnje', icon: 'fa-oil-can' },
+                { title: 'Zamjena filtera zraka', interval: 'Svakih 20.000 - 30.000 km', icon: 'fa-wind' },
+                { title: 'Zamjena kočionih pločica', interval: 'Svakih 30.000 - 50.000 km', icon: 'fa-brake-disc' },
+                { title: 'Zamjena remena', interval: 'Svakih 60.000 - 100.000 km', icon: 'fa-gear' },
+                { title: 'Zamjena rashladne tečnosti', interval: 'Svakih 40.000 km ili 2 godine', icon: 'fa-temperature-low' },
+                { title: 'Provjera geometrije', interval: 'Godišnje ili nakon udara', icon: 'fa-compass' },
+                { title: 'Servis klime', interval: 'Godišnje prije ljeta', icon: 'fa-snowflake' },
+                { title: 'Zamjena akumulatora', interval: 'Svake 3-5 godina', icon: 'fa-car-battery' }
+            ];
+
+            pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-bell"></i>Podsjetnici</h2><button class="btn btn-primary" onclick="openReminderModal()"><i class="fas fa-plus"></i>Novi Podsjetnik</button></div>
+<div class="card"><div class="card-title"><i class="fas fa-clock"></i>Aktivni Podsjetnici (${active.length})</div>
+${active.length ? active.map(r => {
+                const d = new Date(r.dueDate), now = new Date(), diff = Math.ceil((d - now) / (1000 * 60 * 60 * 24)); const cls = diff < 0 ? 'urgent' : diff < 7 ? 'soon' : '';
+                return `<div class="reminder-item ${cls}"><div class="ri-info"><div class="ri-title">${r.title}</div><div class="ri-sub">${r.vehiclePlate ? '<i class="fas fa-car"></i> ' + r.vehiclePlate : '<i class="fas fa-store"></i> Opće'} ${r.description ? ' — ' + r.description : ''}</div></div><div class="ri-date">${diff < 0 ? '<span style="color:var(--red)">Isteklo ' + Math.abs(diff) + ' dana</span>' : diff === 0 ? '<span style="color:var(--yellow)">Danas!</span>' : 'Za ' + diff + ' dana'}<br>${fmtDate(r.dueDate)}</div><div style="display:flex;gap:6px"><button class="btn btn-sm btn-success" onclick="completeReminder('${r.id}')" title="Završi"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-danger" onclick="deleteReminder('${r.id}')" title="Obriši"><i class="fas fa-trash"></i></button></div></div>`
+            }).join('') : '<div class="empty-state"><i class="fas fa-bell-slash"></i><p>Nema aktivnih podsjetnika</p></div>'}
+</div>
+<div class="card"><div class="card-title"><i class="fas fa-lightbulb"></i>Preporučeni Servisi</div><p style="font-size:.82rem;color:var(--text3);margin-bottom:14px">Kliknite na preporuku da kreirate podsjetnik</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">
+${suggestedServices.map(s => `<div class="reminder-item" style="cursor:pointer;border-left-color:var(--accent2)" onclick="openReminderModal(null,'${s.title}')"><div class="ri-info"><div class="ri-title"><i class="fas ${s.icon}" style="margin-right:6px;color:var(--accent2)"></i>${s.title}</div><div class="ri-sub">${s.interval}</div></div><div><i class="fas fa-plus" style="color:var(--accent2)"></i></div></div>`).join('')}
+</div></div>
+${completed.length ? `<div class="card"><div class="card-title"><i class="fas fa-check-circle"></i>Završeni Podsjetnici (${completed.length})</div>${completed.slice(0, 10).map(r => `<div class="reminder-item" style="opacity:.5;border-left-color:var(--green)"><div class="ri-info"><div class="ri-title" style="text-decoration:line-through">${r.title}</div><div class="ri-sub">${r.vehiclePlate || 'Opće'}</div></div><div class="ri-date">${fmtDate(r.dueDate)}</div><div><button class="btn btn-sm btn-danger" onclick="deleteReminder('${r.id}')"><i class="fas fa-trash"></i></button></div></div>`).join('')}</div>` : ''}`;
+        }
+
+        function openReminderModal(vehicleId, prefillTitle) { openReminderModalForVehicle(vehicleId, null, prefillTitle); }
+
+        function openReminderModalForVehicle(vehicleId, vehiclePlate, prefillTitle) {
+            const vehicles = getVehicles();
+            showModal('Novi Podsjetnik', `
+<div class="form-group"><label>Naslov *</label><input id="remTitle" value="${prefillTitle || ''}" placeholder="npr. Zamjena ulja"></div>
+<div class="form-group"><label>Vozilo</label><select id="remVehicle"><option value="">-- Opći podsjetnik --</option>${vehicles.map(v => `<option value="${v.plate}"${(vehicleId === v.id || vehiclePlate === v.plate) ? ' selected' : ''}>${v.plate} - ${v.owner}</option>`).join('')}</select></div>
+<div class="form-group"><label>Datum Isteka *</label><input type="date" id="remDate" value="${new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}"></div>
+<div class="form-group"><label>Opis</label><textarea id="remDesc" placeholder="Dodatne bilješke..."></textarea></div>
+`, () => { const title = document.getElementById('remTitle').value.trim(); const date = document.getElementById('remDate').value; if (!title || !date) { toast('Popunite naslov i datum!', 'error'); return false } const rem = getReminders(); rem.push({ id: uid(), title, vehiclePlate: document.getElementById('remVehicle').value, dueDate: date, description: document.getElementById('remDesc').value, completed: false, createdAt: Date.now() }); saveReminders(rem); toast('Podsjetnik kreiran!'); renderRemindersPage(); return true; });
+        }
+
+        function completeReminder(id) { const rem = getReminders(); const r = rem.find(x => x.id === id); if (r) r.completed = true; saveReminders(rem); toast('Podsjetnik završen!'); setTimeout(() => renderRemindersPage(), 50); }
+        function deleteReminder(id) { const rem = getReminders().filter(r => r.id !== id); saveReminders(rem); toast('Podsjetnik obrisan!'); setTimeout(() => renderRemindersPage(), 50); }
+
+        // ===== WORKERS =====
+        function renderWorkers() {
+            const pg = document.getElementById('page-workers');
+            const workers = getWorkers().filter(w => w.active);
+            const vehicles = getVehicles();
+            const allRepairs = []; vehicles.forEach(v => (v.repairs || []).forEach(r => allRepairs.push(r)));
+
+            pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-users"></i>Radnici</h2><button class="btn btn-primary" onclick="openWorkerModal()"><i class="fas fa-plus"></i>Novi Radnik</button></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:24px">
+${workers.map(w => {
+                const wRepairs = allRepairs.filter(r => r.worker === w.name); const earned = wRepairs.reduce((s, r) => s + Number(r.charged || 0), 0);
+                return `<div class="worker-card"><div class="worker-avatar">${w.name.charAt(0)}</div><div class="worker-name">${w.name}</div><div class="worker-stat"><i class="fas fa-briefcase"></i> ${w.spec || 'Općenito'}</div><div class="worker-stat"><i class="fas fa-phone"></i> ${w.phone || '-'}</div><div class="worker-stat" style="margin-top:10px"><strong>${wRepairs.length}</strong> popravki • ${fmt(earned)}</div><div style="margin-top:12px;display:flex;gap:6px;justify-content:center"><button class="btn btn-sm btn-secondary" onclick="openWorkerModal('${w.id}')"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-danger" onclick="deleteWorker('${w.id}')"><i class="fas fa-trash"></i></button></div></div>`
+            }).join('')}
+</div>
+<div class="card"><div class="card-title"><i class="fas fa-chart-bar"></i>Performanse Radnika</div><div class="chart-container"><canvas id="workerPerfChart"></canvas></div></div>`;
+
+            // Worker performance chart
+            const wpc = document.getElementById('workerPerfChart');
+            if (wpc) {
+                const wData = workers.map(w => { const wr = allRepairs.filter(r => r.worker === w.name); return { name: w.name, count: wr.length, earned: wr.reduce((s, r) => s + Number(r.charged || 0), 0) }; });
+                new Chart(wpc, { type: 'bar', data: { labels: wData.map(w => w.name), datasets: [{ label: 'Broj Popravki', data: wData.map(w => w.count), backgroundColor: 'rgba(59,130,246,.7)', borderRadius: 6, yAxisID: 'y' }, { label: 'Zarada (KM)', data: wData.map(w => w.earned), backgroundColor: 'rgba(16,185,129,.7)', borderRadius: 6, yAxisID: 'y1' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } } }, scales: { y: { position: 'left', ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,.08)' } }, y1: { position: 'right', ticks: { color: '#64748b', callback: v => fmt(v) }, grid: { display: false } }, x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,.08)' } } } } });
+            }
+        }
+
+        function openWorkerModal(editId) {
+            const w = editId ? getWorkers().find(x => x.id === editId) : null;
+            showModal(`${w ? 'Uredi' : 'Novi'} Radnik`, `
+<div class="form-group"><label>Ime *</label><input id="wName" value="${w ? w.name : ''}" placeholder="Ime i prezime"></div>
+<div class="form-group"><label>Telefon</label><input id="wPhone" value="${w ? w.phone || '' : ''}" placeholder="06x xxx xxx"></div>
+<div class="form-group"><label>Specijalizacija</label><input id="wSpec" value="${w ? w.spec || '' : ''}" placeholder="npr. Mehanika, Elektrika, Limarija..."></div>
+`, () => { const name = document.getElementById('wName').value.trim(); if (!name) { toast('Unesite ime!', 'error'); return false } const workers = getWorkers(); if (w) { const i = workers.findIndex(x => x.id === w.id); workers[i] = { ...workers[i], name, phone: document.getElementById('wPhone').value.trim(), spec: document.getElementById('wSpec').value.trim() }; } else { workers.push({ id: uid(), name, phone: document.getElementById('wPhone').value.trim(), spec: document.getElementById('wSpec').value.trim(), active: true }); } saveWorkers(workers); toast(w ? 'Radnik ažuriran!' : 'Radnik dodan!'); renderWorkers(); return true; });
+        }
+
+        function deleteWorker(id) { const w = getWorkers(); const i = w.findIndex(x => x.id === id); if (i === -1) return; w[i].active = false; saveWorkers(w); toast('Radnik uklonjen!'); setTimeout(() => renderWorkers(), 50); }
+
+        // ===== SETTINGS =====
+        function renderSettings() {
+            const pg = document.getElementById('page-settings');
+            const vehicles = getVehicles(); const repairs = []; vehicles.forEach(v => (v.repairs || []).forEach(r => repairs.push(r)));
+            pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-gear"></i>Postavke</h2></div>
+<div class="card"><div class="card-title"><i class="fas fa-database"></i>Upravljanje Podacima</div>
+<p style="font-size:.85rem;color:var(--text2);margin-bottom:16px">Izvezite ili uvezite podatke radionice. Podaci se čuvaju lokalno u vašem pregledaču.</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<button class="btn btn-primary" onclick="exportData()"><i class="fas fa-file-pdf"></i>Izvezi PDF Izvještaj</button>
+<button class="btn btn-secondary" onclick="exportJSON()"><i class="fas fa-download"></i>Izvezi JSON Backup</button>
+<button class="btn btn-secondary" onclick="document.getElementById('importInput').click()"><i class="fas fa-upload"></i>Uvezi Podatke</button>
+<input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(this)">
+<button class="btn btn-danger" onclick="clearAllData()"><i class="fas fa-trash"></i>Obriši Sve Podatke</button>
+</div></div>
+<div class="card"><div class="card-title"><i class="fas fa-info-circle"></i>Statistika Baze</div>
+<div class="vehicle-info-grid">
+<div class="vehicle-info-item"><label>Vozila</label><span>${vehicles.length}</span></div>
+<div class="vehicle-info-item"><label>Popravke</label><span>${repairs.length}</span></div>
+<div class="vehicle-info-item"><label>Radnici</label><span>${getWorkers().filter(w => w.active).length}</span></div>
+<div class="vehicle-info-item"><label>Troškovi</label><span>${getExpenses().length}</span></div>
+<div class="vehicle-info-item"><label>Podsjetnici</label><span>${getReminders().length}</span></div>
+</div></div>
+<div class="card"><div class="card-title"><i class="fas fa-print"></i>Ispis Izvještaja</div>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<button class="btn btn-secondary" onclick="printReport('monthly')"><i class="fas fa-file-alt"></i>Mjesečni Izvještaj</button>
+<button class="btn btn-secondary" onclick="printReport('yearly')"><i class="fas fa-file-alt"></i>Godišnji Izvještaj</button>
+</div></div>`;
+        }
+
+        function exportData() {
+            try {
+                if (!window.jspdf) { toast('Greška: jsPDF nije učitan!', 'error'); return; }
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                const now = new Date();
+                const vehicles = getVehicles(); const workers = getWorkers().filter(w => w.active); const expenses = getExpenses();
+                const allRepairs = []; vehicles.forEach(v => (v.repairs || []).forEach(r => allRepairs.push({ ...r, plate: v.plate, owner: v.owner })));
+                const totalEarned = allRepairs.reduce((s, r) => s + Number(r.charged || 0), 0);
+                const totalParts = allRepairs.reduce((s, r) => s + Number(r.partsCost || 0), 0);
+                const totalExp = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+
+                // Helper to clean Bosnian chars for PDF compatibility with default fonts
+                const clean = (str) => (str || '').toString().replace(/č/g, 'c').replace(/ć/g, 'c').replace(/ž/g, 'z').replace(/š/g, 's').replace(/đ/g, 'dj').replace(/Č/g, 'C').replace(/Ć/g, 'C').replace(/Ž/g, 'Z').replace(/Š/g, 'S').replace(/Đ/g, 'Dj');
+
+                doc.setFillColor(30, 41, 59); doc.rect(0, 0, 210, 40, 'F');
+                doc.setTextColor(255); doc.setFontSize(22); doc.setFont('helvetica', 'bold');
+                doc.text('Top Auto - Izvjestaj', 105, 18, { align: 'center' });
+                doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+                doc.text('Generisano: ' + now.toLocaleDateString('bs-BA') + ' ' + now.toLocaleTimeString('bs-BA'), 105, 28, { align: 'center' });
+
+                doc.setTextColor(0); let y = 50;
+                doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.text('Pregled Poslovanja', 14, y); y += 10;
+                doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+                doc.text('Ukupno vozila: ' + vehicles.length, 14, y); y += 6;
+                doc.text('Ukupno popravki: ' + allRepairs.length, 14, y); y += 6;
+                doc.text('Ukupna zarada: ' + fmt(totalEarned), 14, y); y += 6;
+                doc.text('Troskovi dijelova: ' + fmt(totalParts), 14, y); y += 6;
+                doc.text('Ostali troskovi: ' + fmt(totalExp), 14, y); y += 6;
+                doc.text('Neto profit: ' + fmt(totalEarned - totalParts - totalExp), 14, y); y += 12;
+
+                if (allRepairs.length) {
+                    doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.text('Popravke', 14, y); y += 4;
+                    doc.autoTable({
+                        startY: y,
+                        head: [['Datum', 'Tablica', 'Vlasnik', 'Opis', 'Radnik', 'Dijelovi', 'Naplaceno']],
+                        body: allRepairs.sort((a, b) => new Date(b.date) - new Date(a.date)).map(r => [fmtDate(r.date), clean(r.plate), clean(r.owner), clean(r.description).substring(0, 25), clean(r.worker), fmt(r.partsCost || 0), fmt(r.charged || 0)]),
+                        theme: 'striped',
+                        headStyles: { fillColor: [59, 130, 246] },
+                        styles: { fontSize: 8, font: 'helvetica' }
+                    });
+                    y = doc.lastAutoTable.finalY + 12;
+                }
+                if (expenses.length) {
+                    if (y > 240) { doc.addPage(); y = 20; }
+                    doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.text('Troskovi Radionice', 14, y); y += 4;
+                    doc.autoTable({ startY: y, head: [['Datum', 'Kategorija', 'Opis', 'Iznos']], body: expenses.sort((a, b) => new Date(b.date) - new Date(a.date)).map(e => [fmtDate(e.date), clean(e.category), clean(e.description), fmt(e.amount)]), theme: 'striped', headStyles: { fillColor: [239, 68, 68] }, styles: { fontSize: 8, font: 'helvetica' } });
+                    y = doc.lastAutoTable.finalY + 12;
+                }
+                const pageCount = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= pageCount; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150); doc.text('Top Auto (c) ' + now.getFullYear() + ' | Stranica ' + i + '/' + pageCount, 105, 290, { align: 'center' }); }
+
+                const fileName = 'topauto_izvjestaj_' + now.toISOString().split('T')[0] + '.pdf';
+                doc.save(fileName);
+                toast('PDF izvještaj kreiran!');
+            } catch (err) {
+                console.error(err);
+                toast('Greška pri generisanju PDF-a!', 'error');
+            }
+        }
+        function exportJSON() {
+            try {
+                const data = { vehicles: getVehicles(), workers: getWorkers(), expenses: getExpenses(), reminders: getReminders(), exportDate: new Date().toISOString() };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'topauto_backup_' + new Date().toISOString().split('T')[0] + '.json';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+                toast('JSON backup kreiran!');
+            } catch (err) {
+                toast('Greška pri izvozu podataka!', 'error');
+            }
+        }
+
+        function importData(input) {
+            if (!input.files[0]) return;
+            const reader = new FileReader();
+            reader.onload = function (e) { try { const data = JSON.parse(e.target.result); if (data.vehicles) saveVehicles(data.vehicles); if (data.workers) saveWorkers(data.workers); if (data.expenses) saveExpenses(data.expenses); if (data.reminders) saveReminders(data.reminders); toast('Podaci uvezeni!'); navigate('dashboard'); } catch (er) { toast('Greška pri uvozu!', 'error'); } };
+            reader.readAsText(input.files[0]);
+        }
+
+        function clearAllData() { if (!confirm('UPOZORENJE: Ovo će obrisati SVE podatke! Jeste li sigurni?')) return; if (!confirm('Posljednja šansa - zaista obrisati sve?')) return; localStorage.clear(); DB.init(); toast('Svi podaci obrisani!'); navigate('dashboard'); }
+
+        function printReport(type) {
+            const vehicles = getVehicles(); const now = new Date();
+            let repairs = []; vehicles.forEach(v => (v.repairs || []).forEach(r => { const d = new Date(r.date); if (type === 'monthly' && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) repairs.push({ ...r, plate: v.plate, owner: v.owner }); else if (type === 'yearly' && d.getFullYear() === now.getFullYear()) repairs.push({ ...r, plate: v.plate, owner: v.owner }); }));
+            const totalCharged = repairs.reduce((s, r) => s + Number(r.charged || 0), 0);
+            const totalParts = repairs.reduce((s, r) => s + Number(r.partsCost || 0), 0);
+            const period = type === 'monthly' ? now.toLocaleDateString('bs-BA', { month: 'long', year: 'numeric' }) : now.getFullYear();
+            const w = window.open('', '', 'width=800,height=600');
+            w.document.write(`<html><head><title>Top Auto - Izvještaj</title><style>body{font-family:Arial,sans-serif;padding:40px;color:#333}h1{color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:10px}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{padding:8px 12px;border:1px solid #ddd;text-align:left;font-size:13px}th{background:#f0f0f0}tfoot td{font-weight:bold;background:#f8f8f8}.header{display:flex;justify-content:space-between;align-items:center}.stats{display:flex;gap:30px;margin:20px 0}</style></head><body><div class="header"><h1>🔧 Top Auto - Izvještaj</h1><p>Period: ${period}</p></div><div class="stats"><div><strong>Ukupno popravki:</strong> ${repairs.length}</div><div><strong>Zarada:</strong> ${fmt(totalCharged)}</div><div><strong>Troškovi dijelova:</strong> ${fmt(totalParts)}</div><div><strong>Profit:</strong> ${fmt(totalCharged - totalParts)}</div></div><table><thead><tr><th>Datum</th><th>Tablica</th><th>Vlasnik</th><th>Opis</th><th>Radnik</th><th>Dijelovi</th><th>Naplaćeno</th></tr></thead><tbody>${repairs.map(r => `<tr><td>${fmtDate(r.date)}</td><td>${r.plate}</td><td>${r.owner}</td><td>${r.description || '-'}</td><td>${r.worker || '-'}</td><td>${fmt(r.partsCost || 0)}</td><td>${fmt(r.charged || 0)}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="5">UKUPNO</td><td>${fmt(totalParts)}</td><td>${fmt(totalCharged)}</td></tr></tfoot></table><p style="text-align:center;color:#999;margin-top:40px">Generisano: ${new Date().toLocaleString('bs-BA')} | Top Auto © ${now.getFullYear()}</p></body></html>`);
+            w.document.close(); w.print();
+        }
+
+        // ===== MODAL SYSTEM =====
+        function showModal(title, content, onSave) {
+            const root = document.getElementById('modal-root');
+            root.innerHTML = `<div class="modal-overlay active" id="modalOverlay"><div class="modal"><div class="modal-header"><h3>${title}</h3><button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button></div><div id="modalBody">${content}</div><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px"><button class="btn btn-secondary" onclick="closeModal()">Otkaži</button><button class="btn btn-primary" id="modalSaveBtn">Spremi</button></div></div></div>`;
+            document.getElementById('modalSaveBtn').onclick = () => { if (onSave() !== false) closeModal() };
+            document.getElementById('modalOverlay').onclick = e => { if (e.target.id === 'modalOverlay') closeModal() };
+        }
+        function closeModal() { const m = document.getElementById('modal-root'); if (m) m.innerHTML = ''; }
+
+        // Start checking reminders after initialization
+        function startReminderCheck() {
+            const rem = getReminders().filter(r => !r.completed);
+            const now = new Date();
+            const overdue = rem.filter(r => new Date(r.dueDate) < now);
+            const today = rem.filter(r => { const d = new Date(r.dueDate); return d.toDateString() === now.toDateString() });
+            if (overdue.length) setTimeout(() => toast(`⚠️ Imate ${overdue.length} isteklih podsjetnika!`, 'error'), 1000);
+            else if (today.length) setTimeout(() => toast(`🔔 Imate ${today.length} podsjetnika za danas!`, 'info'), 1000);
+        }
+
+        // WordPress / Browser Init
+        document.addEventListener('DOMContentLoaded', function () {
+            try {
+                const loader = document.getElementById('topauto-loader');
+                if (loader) loader.style.display = 'none';
+
+                if (typeof DB !== 'undefined') {
+                    DB.init();
+                    renderSidebar();
+                    initPages();
+                    navigate('dashboard');
+                    startReminderCheck();
+                }
+            } catch (e) {
+                console.error("Top Auto Error:", e);
+                const wrapper = document.getElementById('topauto-app-wrapper');
+                if (wrapper) wrapper.innerHTML = `<div style="color:red;padding:20px;background:#1a1a1a;border-radius:8px">Greška: ${e.message}</div>`;
+            }
+        });
+    </script>
+</body>
+
+</html>
