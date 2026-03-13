@@ -986,11 +986,16 @@
             filter: drop-shadow(0 0 10px rgba(231, 76, 60, 0.3));
         }
 
+        .sidebar-logo {
+            text-align: center;
+            padding: 30px 10px;
+        }
+
         .sidebar-logo img {
-            width: 50px;
+            width: 80px;
             height: auto;
-            margin-right: 12px;
-            vertical-align: middle;
+            display: block;
+            margin: 0 auto 10px;
         }
     </style>
 </head>
@@ -999,7 +1004,6 @@
     <div id="login-screen">
         <div class="login-card">
             <img src="topautologo.png" alt="Top Auto" class="login-logo">
-            <h2>Top Auto</h2>
             <p style="color:var(--text3); margin-bottom: 30px; font-size: 0.9rem;">Sustav za upravljanje radionicom</p>
             <div class="form-group">
                 <input type="password" id="loginPass" class="login-input" maxlength="4" placeholder="••••"
@@ -1241,16 +1245,22 @@
                 totalSve += Number(r.charged || 0);
                 const descItems = r.description.split(';').map(i => i.trim()).filter(i => i);
 
-                // Add a sub-header for each service date in the table
-                rows.push([{ content: cl("Servis od " + fmtDate(r.date)), colSpan: 4, styles: { fillColor: [241, 245, 249], fontStyle: 'bold', fontSize: 8 } }]);
+                // Naslov servisa sa datumom
+                rows.push([{ content: cl("SERVIS: " + fmtDate(r.date)), colSpan: 4, styles: { fillColor: [241, 245, 249], fontStyle: 'bold', fontSize: 8 } }]);
 
-                descItems.forEach(item => {
-                    rows.push([cl(item), "kom", "1", ""]);
+                // Usluge (Rad) - Cijena ide na prvu stavku
+                descItems.forEach((item, idx) => {
+                    const price = (idx === 0 && r.laborCost > 0) ? fmt(r.laborCost).replace('BAM', '') : "";
+                    rows.push([cl(item), "kom", "1", price]);
                 });
 
+                // Dijelovi - Cijena ide na prvu stavku dijelova
                 if (r.partsUsed) {
                     const parts = r.partsUsed.split(';').map(p => p.trim()).filter(p => p);
-                    parts.forEach(p => rows.push([cl(p), "kom", "1", ""]));
+                    parts.forEach((p, idx) => {
+                        const price = (idx === 0 && r.partsCost > 0) ? fmt(r.partsCost).replace('BAM', '') : "";
+                        rows.push([cl(p), "kom", "1", price]);
+                    });
                 }
             });
 
@@ -1293,7 +1303,7 @@
 
         function renderSidebar() {
             const sb = document.getElementById('sidebar');
-            sb.innerHTML = `<div class="sidebar-logo"><h1><img src="topautologo.png" alt="Logo"> Top Auto</h1><p>Upravljanje Radionicom</p></div><div class="nav-items">${pages.map((p, i) => `<div class="nav-item${p === 'dashboard' ? ' active' : ''}" data-page="${p}"><i class="fas ${pageIcons[i]}"></i>${pageNames[i]}</div>`).join('')}</div><div class="nav-version">Top Auto v1.0 © 2026</div>`;
+            sb.innerHTML = `<div class="sidebar-logo"><img src="topautologo.png" alt="Logo"><p>Upravljanje Radionicom</p></div><div class="nav-items">${pages.map((p, i) => `<div class="nav-item${p === 'dashboard' ? ' active' : ''}" data-page="${p}"><i class="fas ${pageIcons[i]}"></i>${pageNames[i]}</div>`).join('')}</div><div class="nav-version">Top Auto v1.0 © 2026</div>`;
             sb.querySelectorAll('.nav-item').forEach(n => n.onclick = () => navigate(n.dataset.page));
             document.body.insertAdjacentHTML('afterbegin', '<div class="hamburger" onclick="document.getElementById(\'sidebar\').classList.toggle(\'open\')"><i class="fas fa-bars"></i></div>');
         }
