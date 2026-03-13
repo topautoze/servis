@@ -944,14 +944,11 @@
         function getReminders() { return DB.get('reminders') || [] }
         function saveReminders(r) { DB.set('reminders', r); syncToGoogleSheets(); }
 
-        // ===== GOOGLE SHEETS CLOUD =====
-        const getGSUrl = () => localStorage.getItem('ta_gs_url') || '';
-        const setGSUrl = (url) => localStorage.setItem('ta_gs_url', url);
+        // ===== GOOGLE SHEETS CLOUD (AUTOMATED) =====
+        const GS_URL = 'https://script.google.com/macros/s/AKfycbwoNigif47nHYbdOQ3jpR0D-6niyQo7jyi8FLCQxeU5W_vvrqjWCyqTo3V3jrthB2UM6A/exec';
 
         async function syncToGoogleSheets() {
-            const url = getGSUrl();
-            if (!url) return;
-
+            // Instant background sync
             const fullData = {
                 vehicles: getVehicles(),
                 workers: getWorkers(),
@@ -960,63 +957,44 @@
                 lastUpdate: new Date().toISOString()
             };
 
-            // Visual indicator
-            const syncBtn = document.querySelector('[onclick*="syncToGoogleSheets"]');
-            if (syncBtn) syncBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sinkronizacija...';
-
             try {
-                // We use a formal fetch here. Google Apps Script requires a redirect follow.
-                // Note: CORS might still be tricky, so we use a simplified approach that works with Apps Script
-                await fetch(url, {
+                await fetch(GS_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'sync', data: fullData })
                 });
-                console.log('Automatsko slanje završeno');
+                console.log('Automatsko slanje završeno (pozadinsko)');
                 localStorage.setItem('ta_last_sync', fullData.lastUpdate);
             } catch (e) {
-                console.error('GS Sync Error:', e);
-            } finally {
-                if (syncBtn) syncBtn.innerHTML = '<i class="fas fa-cloud-upload"></i> Forsiraj slanje u Tabelu';
+                console.error('Auto-sync error:', e);
             }
         }
 
         async function loadFromGoogleSheets(isAuto = false) {
-            const url = getGSUrl();
-            if (!url) return;
-
-            if (!isAuto) toast('Učitavam podatke iz Google Tabele...', 'info');
-
             try {
-                const response = await fetch(url + '?action=get');
+                const response = await fetch(GS_URL + '?action=get');
                 const result = await response.json();
 
                 if (result.status === 'success' && result.data) {
-                    const localData = { lastUpdate: localStorage.getItem('ta_last_sync') || '0' };
+                    const localUpdate = localStorage.getItem('ta_last_sync') || '0';
                     const serverData = result.data;
 
                     // Only import if server data is newer than what we last synced OR if we have no local data
-                    if (!localData.lastUpdate || new Date(serverData.lastUpdate) > new Date(localData.lastUpdate)) {
+                    if (!localUpdate || new Date(serverData.lastUpdate) > new Date(localUpdate)) {
                         importJSONData(serverData);
                         localStorage.setItem('ta_last_sync', serverData.lastUpdate);
 
                         if (isAuto) {
-                            toast('Podaci automatski ažurirani sa oblaka', 'info');
+                            toast('Podaci sinkronizirani sa oblaka', 'info');
                             // Refresh current page if needed
                             const activePage = document.querySelector('.page.active').id.replace('page-', '');
                             navigate(activePage);
-                        } else {
-                            toast('Podaci učitani!', 'success');
-                            navigate('dashboard');
                         }
-                    } else if (!isAuto) {
-                        toast('Već imate najnovije podatke.', 'info');
                     }
                 }
             } catch (e) {
-                console.error('Load Error:', e);
-                if (!isAuto) toast('Greška pri dohvaćanju podataka.', 'error');
+                console.error('Auto-load error:', e);
             }
         }
 
@@ -1493,16 +1471,8 @@ ${workers.map(w => {
             const pg = document.getElementById('page-settings');
             const vehicles = getVehicles(); const repairs = []; vehicles.forEach(v => (v.repairs || []).forEach(r => repairs.push(r)));
             pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-gear"></i>Postavke</h2></div>
-<div class="card"><div class="card-title"><i class="fas fa-table"></i> Google Sheets Automatska Sigurnosna Kopija</div>
-<p style="font-size:.85rem;color:var(--text2);margin-bottom:12px">Podaci se automatski čuvaju u Google Tabeli čim ih unesete, ako je URL postavljen.</p>
-<div class="form-group"><label>Google Web App URL (Apps Script)</label><div style="display:flex;gap:8px"><input id="gsUrlInput" value="${getGSUrl()}" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1"><button class="btn btn-secondary" onclick="setGSUrl(document.getElementById('gsUrlInput').value);toast('URL spremljen!')">Spremi URL</button></div></div>
-<div style="display:flex;gap:10px;margin-top:12px">
-<button class="btn btn-primary" onclick="syncToGoogleSheets();toast('Sinhronizacija pokrenuta...')"><i class="fas fa-cloud-upload"></i> Forsiraj slanje u Tabelu</button>
-<button class="btn btn-secondary" onclick="loadFromGoogleSheets()"><i class="fas fa-cloud-download"></i> Učitaj iz Tabele na ovaj uređaj</button>
-</div>
-</div>
 <div class="card"><div class="card-title"><i class="fas fa-database"></i>Upravljanje Podacima</div>
-<p style="font-size:.85rem;color:var(--text2);margin-bottom:16px">Ručni izvoz i uvoz podataka. Podaci se čuvaju lokalno u vašem pregledaču.</p>
+<p style="font-size:.85rem;color:var(--text2);margin-bottom:16px">Podaci se automatski sinkroniziraju u pozadini. Ovdje možete izvršiti ručni backup.</p>
 <div style="display:flex;gap:10px;flex-wrap:wrap">
 <button class="btn btn-primary" onclick="exportData()"><i class="fas fa-file-pdf"></i>Izvezi PDF Izvještaj</button>
 <button class="btn btn-secondary" onclick="exportJSON()"><i class="fas fa-download"></i> Izvezi JSON Backup</button>
