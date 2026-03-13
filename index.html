@@ -799,33 +799,90 @@
 
         @media(max-width:768px) {
             #sidebar {
-                transform: translateX(-100%)
+                transform: translateX(-100%);
+                width: 240px;
+                box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
             }
 
             #sidebar.open {
-                transform: translateX(0)
+                transform: translateX(0);
             }
 
             #main-content {
-                margin-left: 0;
-                padding: 16px
+                margin-left: 0 !important;
+                padding: 70px 16px 30px;
+                /* Space for hamburger */
             }
 
             .hamburger {
-                display: block
+                display: block;
+                background: rgba(17, 24, 39, 0.95);
+                backdrop-filter: blur(10px);
+                border-color: var(--accent);
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
             }
 
             .form-row {
-                grid-template-columns: 1fr
+                grid-template-columns: 1fr;
             }
 
             .stat-cards {
-                grid-template-columns: 1fr 1fr
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
             }
 
             .modal {
                 width: 95%;
-                padding: 20px
+                padding: 16px;
+                margin: 20px auto;
+            }
+
+            .page-header h2 {
+                font-size: 1.3rem;
+            }
+
+            .btn {
+                padding: 12px 18px;
+                /* Larger touch area */
+            }
+
+            .table-wrap {
+                margin: 0 -16px;
+                padding: 0 16px;
+                border-radius: 0;
+            }
+        }
+
+        @media(max-width: 480px) {
+            .stat-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .page-header .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .search-box {
+                flex-direction: column;
+            }
+
+            .search-input {
+                width: 100%;
+            }
+
+            .vehicle-profile-header {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .vehicle-plate {
+                width: 100%;
             }
         }
 
@@ -1200,15 +1257,28 @@
                 .replace(/č/g, 'c').replace(/ć/g, 'c').replace(/ž/g, 'z').replace(/š/g, 's').replace(/đ/g, 'dj')
                 .replace(/Č/g, 'C').replace(/Ć/g, 'C').replace(/Ž/g, 'Z').replace(/Š/g, 'S').replace(/Đ/g, 'Dj');
 
+            async function getBase64(url) {
+                try {
+                    const r = await fetch(url);
+                    const b = await r.blob();
+                    return new Promise((res, rej) => {
+                        const f = new FileReader();
+                        f.onloadend = () => res(f.result);
+                        f.onerror = rej;
+                        f.readAsDataURL(b);
+                    });
+                } catch (e) { return null; }
+            }
+
             toast('Generisanje predračuna...', 'info');
 
             // Header Memo
             try {
                 doc.setDrawColor(231, 76, 60); doc.setLineWidth(1.5);
                 doc.line(14, 10, 14, 45);
-                // Original 680x660 -> Scale to ~35x34mm
-                doc.addImage('topautologo.png', 'PNG', 18, 11, 35, 34);
-            } catch (e) { console.warn("Logo not found"); }
+                const logo = await getBase64('topautologo.png');
+                if (logo) doc.addImage(logo, 'PNG', 18, 11, 35, 34);
+            } catch (e) { console.warn("Logo failed"); }
 
             doc.setFontSize(18); doc.setTextColor(44, 62, 80); doc.setFont('helvetica', 'bold');
             doc.text("TopAuto d.o.o.", 60, 20);
@@ -1220,9 +1290,9 @@
 
             // Invoice Title
             doc.setFontSize(22); doc.setTextColor(0); doc.setFont('helvetica', 'bold');
-            doc.text(cl("PREDRAČUN"), 14, 70);
+            doc.text(cl("PREDRACUN"), 14, 70);
             doc.setFontSize(10); doc.setFont('helvetica', 'normal');
-            doc.text("Broj: PR-" + Math.random().toString(36).substr(2, 6).toUpperCase(), 14, 78);
+            doc.text("Broj: PR-" + Math.random().toString(36).substr(2, 6).toUpperCase() + (v.vin ? " | Broj sasije: " + cl(v.vin) : ""), 14, 78);
             doc.text("Datum: " + new Date().toLocaleDateString('bs-BA'), 14, 83);
 
             // Client Info Box
@@ -1283,7 +1353,10 @@
             doc.text(cl("Rok vazenja predracuna je 7 dana."), 14, finalY + 5);
             doc.setTextColor(0); doc.setFont('helvetica', 'bold');
             doc.text("POTPIS ODGOVORNOG LICA", 140, finalY + 15);
-            try { doc.addImage('sign.png', 'PNG', 140, finalY + 18, 40, 18); } catch (e) { doc.line(140, finalY + 30, 180, finalY + 30); }
+            try {
+                const sign = await getBase64('sign.png');
+                if (sign) doc.addImage(sign, 'PNG', 140, finalY + 18, 40, 18);
+            } catch (e) { doc.line(140, finalY + 30, 180, finalY + 30); }
 
             doc.save("Predracun_" + cl(v.plate) + ".pdf");
             toast('Predračun uspješno kreiran!', 'success');
@@ -1389,14 +1462,14 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
                 const rc = (v.repairs || []).length;
                 const tot = (v.repairs || []).reduce((s, r) => s + Number(r.charged || 0), 0);
                 const thumb = v.images && v.images.length ? v.images[0] : null;
-                return `<tr style="cursor:pointer" onclick="navigate('vehicles','${v.id}')"><td>${thumb ? `<img src="${thumb}" style="width:50px;height:35px;border-radius:4px;object-fit:cover;border:1px solid var(--border)">` : `<div style="width:50px;height:35px;border-radius:4px;background:var(--card);display:flex;align-items:center;justify-content:center;border:1px solid var(--border)"><i class="fas fa-car" style="font-size:0.8rem;color:var(--text3)"></i></div>`}</td><td><strong>${v.plate}</strong></td><td>${v.owner}</td><td>${v.make} ${v.model} ${v.year || ''}</td><td>${v.regNumber || '-'}</td><td><span class="badge badge-blue">${rc}</span></td><td>${fmt(tot)}</td><td><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openVehicleModal('${v.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteVehicle('${v.id}')"><i class="fas fa-trash"></i></button></td></tr>`
+                return `<tr style="cursor:pointer" onclick="navigate('vehicles','${v.id}')"><td>${thumb ? `<img src="${thumb}" style="width:50px;height:35px;border-radius:4px;object-fit:cover;border:1px solid var(--border)">` : `<div style="width:50px;height:35px;border-radius:4px;background:var(--card);display:flex;align-items:center;justify-content:center;border:1px solid var(--border)"><i class="fas fa-car" style="font-size:0.8rem;color:var(--text3)"></i></div>`}</td><td><strong>${v.plate}</strong></td><td>${v.owner}</td><td>${v.make} ${v.model} ${v.year || ''}<br><small style="color:var(--text3)">${v.vin || '-'}</small></td><td>${v.regNumber || '-'}</td><td><span class="badge badge-blue">${rc}</span></td><td>${fmt(tot)}</td><td><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openVehicleModal('${v.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteVehicle('${v.id}')"><i class="fas fa-trash"></i></button></td></tr>`
             }).join('')}</tbody></table></div>`;
         }
 
         function filterVehicles() {
             const q = document.getElementById('vSearch').value.toLowerCase();
             const sort = document.getElementById('vSort').value;
-            let vehicles = getVehicles().filter(v => (v.plate + ' ' + v.owner + ' ' + (v.regNumber || '') + ' ' + v.make + ' ' + v.model).toLowerCase().includes(q));
+            let vehicles = getVehicles().filter(v => (v.plate + ' ' + v.owner + ' ' + (v.regNumber || '') + ' ' + (v.vin || '') + ' ' + v.make + ' ' + v.model).toLowerCase().includes(q));
             if (sort === 'name') vehicles.sort((a, b) => a.owner.localeCompare(b.owner));
             else if (sort === 'plate') vehicles.sort((a, b) => a.plate.localeCompare(b.plate));
             else vehicles.sort((a, b) => b.createdAt - a.createdAt);
@@ -1408,8 +1481,8 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
             const workers = getWorkers().filter(w => w.active);
             showModal(`${v ? 'Uredi' : 'Novo'} Vozilo`, `
 <div class="ocr-zone" onclick="document.getElementById('ocrInput').click()"><i class="fas fa-camera"></i><p style="color:var(--text3);font-size:.82rem">Kliknite za sliku tablice/registracije (OCR)</p><input type="file" id="ocrInput" accept="image/*" capture="environment" style="display:none" onchange="handleOCR(this)"></div>
-<div class="form-row"><div class="form-group"><label>Registarska Tablica *</label><input id="fPlate" value="${v ? v.plate : ''}" placeholder="npr. A12-B-345"></div><div class="form-group"><label>Broj Registracije</label><input id="fReg" value="${v ? v.regNumber || '' : ''}" placeholder="Broj iz saobraćajne"></div></div>
-<div class="form-group"><label>Vlasnik *</label><input id="fOwner" value="${v ? v.owner : ''}" placeholder="Ime i prezime"></div>
+<div class="form-row"><div class="form-group"><label>Registarska Tablica *</label><input id="fPlate" value="${v ? v.plate : ''}" placeholder="npr. A12-B-345"></div><div class="form-group"><label>Broj Šasije (VIN)</label><input id="fVin" value="${v ? v.vin || '' : ''}" placeholder="17 karaktera"></div></div>
+<div class="form-row"><div class="form-group"><label>Vlasnik *</label><input id="fOwner" value="${v ? v.owner : ''}" placeholder="Ime i prezime"></div><div class="form-group"><label>Broj Registracije</label><input id="fReg" value="${v ? v.regNumber || '' : ''}" placeholder="Saobraćajna dozvola"></div></div>
 <div class="form-row"><div class="form-group"><label>Telefon</label><input id="fPhone" value="${v ? v.phone || '' : ''}" placeholder="06x xxx xxx"></div><div class="form-group"><label>Email</label><input id="fEmail" value="${v ? v.email || '' : ''}" placeholder="email@primjer.com"></div></div>
 <div class="form-row"><div class="form-group"><label>Marka *</label><input id="fMake" value="${v ? v.make : ''}" placeholder="npr. Volkswagen"></div><div class="form-group"><label>Model *</label><input id="fModel" value="${v ? v.model : ''}" placeholder="npr. Golf 7"></div></div>
 <div class="form-row"><div class="form-group"><label>Godina</label><input type="number" id="fYear" value="${v ? v.year || '' : ''}" placeholder="2020"></div><div class="form-group"><label>Kilometraža</label><input type="number" id="fKm" value="${v ? v.km || '' : ''}" placeholder="150000"></div></div>
@@ -1423,8 +1496,8 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
                 if (!plate || !owner || !make || !model) { toast('Popunite obavezna polja!', 'error'); return false }
                 const vehicles = getVehicles();
                 const imgData = window._vehicleImages || (v ? v.images : null) || [];
-                if (v) { const idx = vehicles.findIndex(x => x.id === v.id); vehicles[idx] = { ...vehicles[idx], plate, owner, make, model, regNumber: document.getElementById('fReg').value.trim(), phone: document.getElementById('fPhone').value.trim(), email: document.getElementById('fEmail').value.trim(), year: document.getElementById('fYear').value, km: document.getElementById('fKm').value, notes: document.getElementById('fNotes').value, images: imgData }; }
-                else { vehicles.push({ id: uid(), plate, owner, make, model, regNumber: document.getElementById('fReg').value.trim(), phone: document.getElementById('fPhone').value.trim(), email: document.getElementById('fEmail').value.trim(), year: document.getElementById('fYear').value, km: document.getElementById('fKm').value, notes: document.getElementById('fNotes').value, images: imgData, repairs: [], createdAt: Date.now() }); }
+                if (v) { const idx = vehicles.findIndex(x => x.id === v.id); vehicles[idx] = { ...vehicles[idx], plate, owner, make, model, regNumber: document.getElementById('fReg').value.trim(), vin: document.getElementById('fVin').value.trim(), phone: document.getElementById('fPhone').value.trim(), email: document.getElementById('fEmail').value.trim(), year: document.getElementById('fYear').value, km: document.getElementById('fKm').value, notes: document.getElementById('fNotes').value, images: imgData }; }
+                else { vehicles.push({ id: uid(), plate, owner, make, model, regNumber: document.getElementById('fReg').value.trim(), vin: document.getElementById('fVin').value.trim(), phone: document.getElementById('fPhone').value.trim(), email: document.getElementById('fEmail').value.trim(), year: document.getElementById('fYear').value, km: document.getElementById('fKm').value, notes: document.getElementById('fNotes').value, images: imgData, repairs: [], createdAt: Date.now() }); }
                 window._vehicleImages = null;
                 saveVehicles(vehicles); toast(v ? 'Vozilo ažurirano!' : 'Vozilo dodano!'); renderVehicles(); return true;
             });
@@ -1544,6 +1617,7 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
             pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-arrow-left" style="cursor:pointer" onclick="renderVehicles()"></i> Profil Vozila</h2><div><button class="btn btn-secondary" onclick="openVehicleModal('${v.id}')"><i class="fas fa-edit"></i>Uredi Vozilo</button> <button class="btn btn-primary" onclick="openRepairModal('${v.id}')"><i class="fas fa-plus"></i>Nova Popravka</button> <button class="btn btn-secondary" onclick="openReminderModalForVehicle('${v.id}','${v.plate}')"><i class="fas fa-bell"></i>Podsjetnik</button></div></div>
 <div class="vehicle-profile-header"><div class="vehicle-plate">${v.plate}</div><div><h3>${v.owner}</h3><p style="color:var(--text3)">${v.make} ${v.model} ${v.year || ''} ${v.km ? '• ' + Number(v.km).toLocaleString() + ' km' : ''}</p><p style="color:var(--text3);font-size:.8rem">${v.phone || ''} ${v.email ? '• ' + v.email : ''}</p></div></div>
 <div class="vehicle-info-grid">
+<div class="vehicle-info-item"><label>Broj Šasije (VIN)</label><span>${v.vin || '-'}</span></div>
 <div class="vehicle-info-item"><label>Br. Registracije</label><span>${v.regNumber || '-'}</span></div>
 <div class="vehicle-info-item"><label>Ukupno Popravki</label><span>${repairs.length}</span></div>
 <div class="vehicle-info-item"><label>Ukupno Naplaćeno</label><span>${fmt(totalCharged)}</span></div>
