@@ -995,6 +995,13 @@
             }
         }
 
+        function importJSONData(data) {
+            if (data.vehicles) saveVehicles(data.vehicles);
+            if (data.workers) saveWorkers(data.workers);
+            if (data.expenses) saveExpenses(data.expenses);
+            if (data.reminders) saveReminders(data.reminders);
+        }
+
         // Auto-refresh when tab becomes visible
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
