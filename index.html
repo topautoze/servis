@@ -895,10 +895,123 @@
             border-radius: 8px;
             box-shadow: 0 0 40px rgba(0, 0, 0, .5)
         }
+
+        /* Main App Wrapper (Hidden initially) */
+        #topauto-app-wrapper {
+            display: none;
+        }
+
+        /* Login Screen Styles (Full Page) */
+        #login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #2d3436 0%, #000000 100%);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.5s ease;
+        }
+
+        #login-screen.hidden {
+            transform: translateY(-100%);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .login-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            padding: 50px;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .login-card i.logo-icon {
+            font-size: 3rem;
+            color: var(--accent);
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .login-card h2 {
+            margin-bottom: 10px;
+            color: #fff;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 1.5rem;
+            text-align: center;
+            letter-spacing: 8px;
+            margin-bottom: 25px;
+            transition: all 0.3s;
+        }
+
+        .login-input:focus {
+            border-color: var(--accent);
+            background: rgba(0, 0, 0, 0.5);
+            outline: none;
+            box-shadow: 0 0 15px rgba(231, 76, 60, 0.3);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 15px;
+            border-radius: 12px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .login-logo {
+            width: 120px;
+            height: auto;
+            margin: 0 auto 20px;
+            display: block;
+            filter: drop-shadow(0 0 10px rgba(231, 76, 60, 0.3));
+        }
+
+        .sidebar-logo img {
+            width: 50px;
+            height: auto;
+            margin-right: 12px;
+            vertical-align: middle;
+        }
     </style>
 </head>
 
 <body>
+    <div id="login-screen">
+        <div class="login-card">
+            <img src="topautologo.png" alt="Top Auto" class="login-logo">
+            <h2>Top Auto</h2>
+            <p style="color:var(--text3); margin-bottom: 30px; font-size: 0.9rem;">Sustav za upravljanje radionicom</p>
+            <div class="form-group">
+                <input type="password" id="loginPass" class="login-input" maxlength="4" placeholder="••••"
+                    onkeyup="if(this.value.length==4) handleLogin()">
+            </div>
+            <button class="btn btn-primary login-btn" onclick="handleLogin()">Prijavi se</button>
+            <p id="loginError"
+                style="color:var(--red); font-size:0.9rem; margin-top:20px; display:none; font-weight: 500;">
+                <i class="fas fa-exclamation-circle"></i> Pogrešna šifra!
+            </p>
+        </div>
+    </div>
     <div id="topauto-app-wrapper">
         <div id="app">
             <nav id="sidebar"></nav>
@@ -909,8 +1022,32 @@
         </div>
     </div>
     <script>
-        // WordPress Fix: Ensure everything runs after DOM is ready
+        // WordPress / Browser Init
         document.addEventListener('DOMContentLoaded', function () {
+            // Re-check session on load
+            if (sessionStorage.getItem('ta_auth') === 'true') {
+                showApp();
+            }
+        });
+
+        function handleLogin() {
+            const pass = document.getElementById('loginPass').value;
+            const error = document.getElementById('loginError');
+            if (pass === '8520') {
+                sessionStorage.setItem('ta_auth', 'true');
+                showApp();
+            } else {
+                error.style.display = 'block';
+                document.getElementById('loginPass').value = '';
+                setTimeout(() => error.style.display = 'none', 2000);
+            }
+        }
+
+        function showApp() {
+            document.getElementById('login-screen').classList.add('hidden');
+            const wrapper = document.getElementById('topauto-app-wrapper');
+            wrapper.style.display = 'block';
+
             try {
                 const loader = document.getElementById('topauto-loader');
                 if (loader) loader.style.display = 'none';
@@ -920,17 +1057,18 @@
                     renderSidebar();
                     initPages();
                     navigate('dashboard');
-                } else {
-                    console.error("Top Auto: Scripts not loaded properly.");
+                    startReminderCheck();
+                    // Initial load from cloud
+                    setTimeout(() => loadFromGoogleSheets(true), 800);
                 }
             } catch (e) {
-                console.error("Top Auto Inicijalizacija Error:", e);
-                document.getElementById('topauto-app-wrapper').innerHTML = `<div style="color:red;padding:20px;background:#1a1a1a;border-radius:8px">Greška pri pokretanju aplikacije. Provjerite konzolu pregledača (F12).<br>Detalji: ${e.message}</div>`;
+                console.error("Top Auto Error:", e);
+                const wrapper = document.getElementById('topauto-app-wrapper');
+                if (wrapper) wrapper.innerHTML = `<div style="color:red;padding:20px;background:#1a1a1a;border-radius:8px">Greška: ${e.message}</div>`;
             }
-        });
+        }
         // ===== DATA LAYER =====
         const DB = { get(k) { try { return JSON.parse(localStorage.getItem('ta_' + k)) || null } catch (e) { return null } }, set(k, v) { localStorage.setItem('ta_' + k, JSON.stringify(v)) }, init() { if (!this.get('vehicles')) this.set('vehicles', []); if (!this.get('workers')) this.set('workers', [{ id: 'w1', name: 'Dragan', phone: '', spec: 'Mehanika', active: true }, { id: 'w2', name: 'Sadmir', phone: '', spec: 'Elektrika', active: true }]); if (!this.get('expenses')) this.set('expenses', []); if (!this.get('reminders')) this.set('reminders', []) } };
-        DB.init();
         function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5) }
         function fmt(n) { return new Intl.NumberFormat('bs-BA', { style: 'currency', currency: 'BAM' }).format(n) }
         function fmtDate(d) { if (!d) return '-'; return new Date(d).toLocaleDateString('bs-BA') }
@@ -1002,6 +1140,145 @@
             if (data.reminders) saveReminders(data.reminders);
         }
 
+        // ===== PROFORMA (PREDRAČUNI) =====
+        function renderProformaPage() {
+            const pg = document.getElementById('page-proforma');
+            const vehicles = getVehicles();
+
+            pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-file-invoice"></i>Predračuni</h2></div>
+<div class="card"><div class="card-title"><i class="fas fa-car"></i>Izaberite vozilo za predračun</div>
+<div class="table-wrap"><table><thead><tr><th>Vlasnik</th><th>Vozilo</th><th>Tablica</th><th>Popravke</th><th>Akcija</th></tr></thead><tbody>${vehicles.map(v => `<tr><td>${v.owner}</td><td>${v.make} ${v.model}</td><td><strong>${v.plate}</strong></td><td><span class="badge badge-blue">${(v.repairs || []).length}</span></td><td><button class="btn btn-sm btn-primary" onclick="openProformaSelectionModal('${v.id}')"><i class="fas fa-list-check"></i> Izaberi Popravke</button></td></tr>`).join('')}</tbody></table></div></div>`;
+        }
+
+        function openProformaSelectionModal(vId) {
+            const v = getVehicles().find(x => x.id === vId);
+            if (!v || !v.repairs || !v.repairs.length) { toast('Ovo vozilo nema snimljenih popravki!', 'warning'); return; }
+
+            const repairs = [...v.repairs].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            showModal(`Izbor popravki - ${v.plate}`, `
+                <p style="margin-bottom:15px;color:var(--text2)">Označite popravke koje želite uključiti u predračun:</p>
+                <div class="selection-list" style="max-height:350px;overflow-y:auto;padding-right:5px">
+                    ${repairs.map(r => `
+                        <div class="form-group" style="background:var(--bg3);padding:12px;border-radius:10px;margin-bottom:8px;display:flex;align-items:center;gap:15px;cursor:pointer;border:1px solid var(--border)" onclick="const c = this.querySelector('input'); c.checked = !c.checked">
+                            <input type="checkbox" name="selRepair" value="${r.id}" style="width:20px;height:20px" checked onclick="event.stopPropagation()">
+                            <div style="flex:1">
+                                <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                                    <strong style="color:var(--accent)">${fmtDate(r.date)}</strong>
+                                    <span style="color:var(--text);font-weight:700">${fmt(r.charged)}</span>
+                                </div>
+                                <div style="font-size:0.85rem;color:var(--text3);line-height:1.3">${r.description.substring(0, 80)}${r.description.length > 80 ? '...' : ''}</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div style="margin-top:15px;padding-top:15px;border-top:1px solid var(--border);text-align:right">
+                    <span style="color:var(--text3);font-size:0.9rem">Svi odabrani servisi biće sabrani u jedan PDF.</span>
+                </div>
+            `, () => {
+                const selected = Array.from(document.querySelectorAll('input[name="selRepair"]:checked')).map(i => i.value);
+                if (!selected.length) { toast('Morate izabrati barem jednu stavku!', 'error'); return false; }
+                generateProformaPDF(v.id, selected);
+                return true;
+            });
+        }
+
+        async function generateProformaPDF(vId, rIds) {
+            const vehicles = getVehicles();
+            const v = vehicles.find(x => x.id === vId);
+            const repairs = (v.repairs || []).filter(r => rIds.includes(r.id));
+            if (!repairs.length) return;
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            const cl = (s) => (s || '').toString()
+                .replace(/č/g, 'c').replace(/ć/g, 'c').replace(/ž/g, 'z').replace(/š/g, 's').replace(/đ/g, 'dj')
+                .replace(/Č/g, 'C').replace(/Ć/g, 'C').replace(/Ž/g, 'Z').replace(/Š/g, 'S').replace(/Đ/g, 'Dj');
+
+            toast('Generisanje predračuna...', 'info');
+
+            // Header Memo
+            try {
+                doc.setDrawColor(231, 76, 60); doc.setLineWidth(1.5);
+                doc.line(14, 10, 14, 45);
+                // Original 680x660 -> Scale to ~35x34mm
+                doc.addImage('topautologo.png', 'PNG', 18, 11, 35, 34);
+            } catch (e) { console.warn("Logo not found"); }
+
+            doc.setFontSize(18); doc.setTextColor(44, 62, 80); doc.setFont('helvetica', 'bold');
+            doc.text("TopAuto d.o.o.", 60, 20);
+            doc.setFontSize(10); doc.setTextColor(100); doc.setFont('helvetica', 'normal');
+            doc.text("Servis motornih vozila", 60, 26);
+            doc.text(cl("Adresa: ZAVNOBiH bb, 72000 Zenica"), 60, 32);
+            doc.text("Kontakt telefon: 060 325 2028", 60, 38);
+            doc.setDrawColor(200); doc.setLineWidth(0.5); doc.line(14, 52, 196, 52);
+
+            // Invoice Title
+            doc.setFontSize(22); doc.setTextColor(0); doc.setFont('helvetica', 'bold');
+            doc.text(cl("PREDRAČUN"), 14, 70);
+            doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+            doc.text("Broj: PR-" + Math.random().toString(36).substr(2, 6).toUpperCase(), 14, 78);
+            doc.text("Datum: " + new Date().toLocaleDateString('bs-BA'), 14, 83);
+
+            // Client Info Box
+            doc.setFillColor(248, 250, 252); doc.rect(14, 95, 182, 35, 'F');
+            doc.setFontSize(11); doc.setTextColor(44, 62, 80); doc.setFont('helvetica', 'bold');
+            doc.text("KLIJENT I VOZILO:", 20, 105);
+            doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(80);
+            doc.text(cl("Vlasnik: " + v.owner), 20, 112);
+            doc.text(cl("Vozilo: " + v.make + " " + v.model + " • " + v.plate), 20, 118);
+            if (v.km) doc.text(cl("Trenutna kilometraza: ") + Number(v.km).toLocaleString() + " km", 20, 124);
+
+            // Aggregate Data
+            let totalSve = 0;
+            const rows = [];
+
+            // Sort selected repairs by date
+            repairs.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            repairs.forEach(r => {
+                totalSve += Number(r.charged || 0);
+                const descItems = r.description.split(';').map(i => i.trim()).filter(i => i);
+
+                // Add a sub-header for each service date in the table
+                rows.push([{ content: cl("Servis od " + fmtDate(r.date)), colSpan: 4, styles: { fillColor: [241, 245, 249], fontStyle: 'bold', fontSize: 8 } }]);
+
+                descItems.forEach(item => {
+                    rows.push([cl(item), "kom", "1", ""]);
+                });
+
+                if (r.partsUsed) {
+                    const parts = r.partsUsed.split(';').map(p => p.trim()).filter(p => p);
+                    parts.forEach(p => rows.push([cl(p), "kom", "1", ""]));
+                }
+            });
+
+            rows.push([{ content: cl("UKUPNO ZA UPLATU"), colSpan: 3, styles: { halign: 'right', fontStyle: 'bold', fillColor: [44, 62, 80], textColor: 255 } }, { content: fmt(totalSve), styles: { fontStyle: 'bold', fillColor: [231, 76, 60], textColor: 255 } }]);
+
+            doc.autoTable({
+                startY: 140,
+                head: [[cl("Opis usluge / Rezervnog dijela"), "Jed.", cl("Kolicina"), "Ukupno (BAM)"]],
+                body: rows,
+                theme: 'grid',
+                headStyles: { fillColor: [44, 62, 80], textColor: 255, fontStyle: 'bold' },
+                styles: { fontSize: 8, cellPadding: 3 },
+                columnStyles: { 0: { cellWidth: 100 }, 3: { halign: 'right' } }
+            });
+
+            // Footer
+            const finalY = (doc.lastAutoTable.finalY + 30) > 260 ? 260 : doc.lastAutoTable.finalY + 30;
+            doc.setFontSize(9); doc.setTextColor(100);
+            doc.text(cl("Ovaj dokument je informativnog karaktera i sluzi kao predracun."), 14, finalY);
+            doc.text(cl("Rok vazenja predracuna je 7 dana."), 14, finalY + 5);
+            doc.setTextColor(0); doc.setFont('helvetica', 'bold');
+            doc.text("POTPIS ODGOVORNOG LICA", 140, finalY + 15);
+            try { doc.addImage('sign.png', 'PNG', 140, finalY + 18, 40, 18); } catch (e) { doc.line(140, finalY + 30, 180, finalY + 30); }
+
+            doc.save("Predracun_" + cl(v.plate) + ".pdf");
+            toast('Predračun uspješno kreiran!', 'success');
+        }
+
         // Auto-refresh when tab becomes visible
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
@@ -1010,13 +1287,13 @@
         });
 
         // ===== NAVIGATION =====
-        const pages = ['dashboard', 'vehicles', 'finances', 'reminders', 'workers', 'settings'];
-        const pageIcons = ['fa-gauge-high', 'fa-car', 'fa-chart-line', 'fa-bell', 'fa-users', 'fa-gear'];
-        const pageNames = ['Kontrolna Ploča', 'Vozila', 'Finansije', 'Podsjetnici', 'Radnici', 'Postavke'];
+        const pages = ['dashboard', 'vehicles', 'finances', 'proforma', 'reminders', 'workers', 'settings'];
+        const pageIcons = ['fa-gauge-high', 'fa-car', 'fa-chart-line', 'fa-file-invoice', 'fa-bell', 'fa-users', 'fa-gear'];
+        const pageNames = ['Kontrolna Ploča', 'Vozila', 'Finansije', 'Predračuni', 'Podsjetnici', 'Radnici', 'Postavke'];
 
         function renderSidebar() {
             const sb = document.getElementById('sidebar');
-            sb.innerHTML = `<div class="sidebar-logo"><h1><i class="fas fa-car-side"></i> Top Auto</h1><p>Upravljanje Radionicom</p></div><div class="nav-items">${pages.map((p, i) => `<div class="nav-item${p === 'dashboard' ? ' active' : ''}" data-page="${p}"><i class="fas ${pageIcons[i]}"></i>${pageNames[i]}</div>`).join('')}</div><div class="nav-version">Top Auto v1.0 © 2026</div>`;
+            sb.innerHTML = `<div class="sidebar-logo"><h1><img src="topautologo.png" alt="Logo"> Top Auto</h1><p>Upravljanje Radionicom</p></div><div class="nav-items">${pages.map((p, i) => `<div class="nav-item${p === 'dashboard' ? ' active' : ''}" data-page="${p}"><i class="fas ${pageIcons[i]}"></i>${pageNames[i]}</div>`).join('')}</div><div class="nav-version">Top Auto v1.0 © 2026</div>`;
             sb.querySelectorAll('.nav-item').forEach(n => n.onclick = () => navigate(n.dataset.page));
             document.body.insertAdjacentHTML('afterbegin', '<div class="hamburger" onclick="document.getElementById(\'sidebar\').classList.toggle(\'open\')"><i class="fas fa-bars"></i></div>');
         }
@@ -1029,6 +1306,7 @@
             if (page === 'dashboard') renderDashboard();
             else if (page === 'vehicles') renderVehicles(data);
             else if (page === 'finances') renderFinances();
+            else if (page === 'proforma') renderProformaPage();
             else if (page === 'reminders') renderRemindersPage();
             else if (page === 'workers') renderWorkers();
             else if (page === 'settings') renderSettings();
@@ -1265,7 +1543,7 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
 </div>
 ${vImages.length ? `<div class="card"><div class="card-title"><i class="fas fa-images"></i>Slike Vozila (${vImages.length})</div><div class="img-gallery">${vImages.map(img => '<div class="img-gallery-item" onclick="showLightbox(this.querySelector(\'img\').src)"><img src="' + img + '"></div>').join('')}</div></div>` : ''}
 <div class="card"><div class="card-title"><i class="fas fa-wrench"></i>Historija Popravki</div>
-${repairs.length ? `<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Opis</th><th>Radnik</th><th>Dijelovi</th><th>Cijena Dijelova</th><th>Rad</th><th>Naplaćeno</th><th>Status</th><th>Akcije</th></tr></thead><tbody>${repairs.map(r => `<tr><td>${fmtDate(r.date)}</td><td>${r.description || '-'}</td><td>${r.worker || '-'}</td><td>${r.partsUsed || '-'}</td><td>${fmt(r.partsCost || 0)}</td><td>${fmt(r.laborCost || 0)}</td><td><strong>${fmt(r.charged || 0)}</strong></td><td><span class="badge badge-${r.status === 'done' ? 'green' : r.status === 'active' ? 'yellow' : 'blue'}">${r.status === 'done' ? 'Završeno' : r.status === 'active' ? 'U toku' : 'Čeka'}</span></td><td><button class="btn btn-sm btn-secondary" onclick="openRepairModal('${v.id}','${r.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-sm btn-danger" onclick="deleteRepair('${v.id}','${r.id}')"><i class="fas fa-trash"></i></button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty-state"><i class="fas fa-tools"></i><p>Nema popravki za ovo vozilo.</p></div>'}
+${repairs.length ? `<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Opis</th><th>Radnik</th><th>Dijelovi</th><th>Cijena Dijelova</th><th>Rad</th><th>Naplaćeno</th><th>Status</th><th>Akcije</th></tr></thead><tbody>${repairs.map(r => `<tr><td>${fmtDate(r.date)}</td><td>${r.description || '-'}</td><td>${r.worker || '-'}</td><td>${r.partsUsed || '-'}</td><td>${fmt(r.partsCost || 0)}</td><td>${fmt(r.laborCost || 0)}</td><td><strong>${fmt(r.charged || 0)}</strong></td><td><span class="badge badge-${r.status === 'done' ? 'green' : r.status === 'active' ? 'yellow' : 'blue'}">${r.status === 'done' ? 'Završeno' : r.status === 'active' ? 'U toku' : 'Čeka'}</span></td><td><button class="btn btn-sm btn-primary" title="Predračun PDF" onclick="openProformaSelectionModal('${v.id}')"><i class="fas fa-file-pdf"></i></button> <button class="btn btn-sm btn-secondary" onclick="openRepairModal('${v.id}','${r.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-sm btn-danger" onclick="deleteRepair('${v.id}','${r.id}')"><i class="fas fa-trash"></i></button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty-state"><i class="fas fa-tools"></i><p>Nema popravki za ovo vozilo.</p></div>'}
 </div>`;
         }
 
@@ -1514,11 +1792,16 @@ ${workers.map(w => {
                 // Helper to clean Bosnian chars for PDF compatibility with default fonts
                 const clean = (str) => (str || '').toString().replace(/č/g, 'c').replace(/ć/g, 'c').replace(/ž/g, 'z').replace(/š/g, 's').replace(/đ/g, 'dj').replace(/Č/g, 'C').replace(/Ć/g, 'C').replace(/Ž/g, 'Z').replace(/Š/g, 'S').replace(/Đ/g, 'Dj');
 
-                doc.setFillColor(30, 41, 59); doc.rect(0, 0, 210, 40, 'F');
+                // Report Header
+                doc.setFillColor(30, 41, 59); doc.rect(0, 0, 210, 45, 'F');
+                try {
+                    doc.addImage('topautologo.png', 'PNG', 160, 5, 35, 34);
+                } catch (e) { }
+
                 doc.setTextColor(255); doc.setFontSize(22); doc.setFont('helvetica', 'bold');
-                doc.text('Top Auto - Izvjestaj', 105, 18, { align: 'center' });
+                doc.text('Top Auto - Izvjestaj', 15, 20);
                 doc.setFontSize(10); doc.setFont('helvetica', 'normal');
-                doc.text('Generisano: ' + now.toLocaleDateString('bs-BA') + ' ' + now.toLocaleTimeString('bs-BA'), 105, 28, { align: 'center' });
+                doc.text('Generisano: ' + now.toLocaleDateString('bs-BA') + ' ' + now.toLocaleTimeString('bs-BA'), 15, 30);
 
                 doc.setTextColor(0); let y = 50;
                 doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.text('Pregled Poslovanja', 14, y); y += 10;
