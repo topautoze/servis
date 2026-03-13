@@ -323,6 +323,18 @@
             color: var(--accent2)
         }
 
+        .dash-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .dash-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .search-box {
             display: flex;
             gap: 10px;
@@ -744,7 +756,7 @@
 
         .vehicle-info-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 12px;
             margin-bottom: 20px
         }
@@ -800,7 +812,7 @@
         @media(max-width:768px) {
             #sidebar {
                 transform: translateX(-100%);
-                width: 240px;
+                width: 260px;
                 box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
             }
 
@@ -810,8 +822,7 @@
 
             #main-content {
                 margin-left: 0 !important;
-                padding: 70px 16px 30px;
-                /* Space for hamburger */
+                padding: 75px 12px 30px;
             }
 
             .hamburger {
@@ -820,6 +831,8 @@
                 backdrop-filter: blur(10px);
                 border-color: var(--accent);
                 box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+                top: 12px;
+                left: 12px;
             }
 
             .form-row {
@@ -828,28 +841,53 @@
 
             .stat-cards {
                 grid-template-columns: 1fr 1fr;
-                gap: 12px;
+                gap: 10px;
+            }
+
+            .stat-value {
+                font-size: 1.4rem;
             }
 
             .modal {
-                width: 95%;
-                padding: 16px;
-                margin: 20px auto;
+                width: 96%;
+                padding: 18px;
+                margin: 10px auto;
             }
 
             .page-header h2 {
-                font-size: 1.3rem;
+                font-size: 1.2rem;
             }
 
             .btn {
-                padding: 12px 18px;
-                /* Larger touch area */
+                padding: 10px 16px;
+                font-size: 0.8rem;
             }
 
             .table-wrap {
-                margin: 0 -16px;
-                padding: 0 16px;
-                border-radius: 0;
+                margin: 0 -12px;
+                padding: 0 4px;
+            }
+
+            .table-wrap td,
+            .table-wrap th {
+                padding: 10px 8px;
+                font-size: 0.75rem;
+            }
+
+            .vehicle-plate {
+                font-size: 1.2rem;
+                padding: 8px 16px;
+                width: 100%;
+                text-align: center;
+            }
+
+            .sidebar-logo {
+                padding: 40px 20px 20px;
+            }
+
+            .nav-item {
+                padding: 12px 18px;
+                font-size: 0.9rem;
             }
         }
 
@@ -980,13 +1018,13 @@
         }
 
         .login-card {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(10px);
-            padding: 50px;
-            border-radius: 24px;
+            background: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(20px);
+            padding: 40px 30px;
+            border-radius: 28px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             text-align: center;
-            width: 100%;
+            width: 90%;
             max-width: 400px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
@@ -1036,20 +1074,46 @@
         }
 
         .login-logo {
-            width: 120px;
+            width: 210px;
             height: auto;
             margin: 0 auto 20px;
             display: block;
-            filter: drop-shadow(0 0 10px rgba(231, 76, 60, 0.3));
+            filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.4));
+        }
+
+        .sidebar-logo img {
+            width: 170px;
+            height: auto;
+            margin-bottom: 5px;
+        }
+
+        .hide-mobile {
+            display: table-cell;
+        }
+
+        @media(max-width: 650px) {
+            .hide-mobile {
+                display: none !important;
+            }
+
+            .table-wrap td,
+            .table-wrap th {
+                white-space: normal !important;
+                word-break: break-word !important;
+                font-size: 0.75rem !important;
+                padding: 10px 8px !important;
+            }
         }
 
         .sidebar-logo {
             text-align: center;
             padding: 30px 10px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
         }
 
         .sidebar-logo img {
-            width: 80px;
+            width: 170px;
             height: auto;
             display: block;
             margin: 0 auto 10px;
@@ -1061,7 +1125,7 @@
     <div id="login-screen">
         <div class="login-card">
             <img src="topautologo.png" alt="Top Auto" class="login-logo">
-            <p style="color:var(--text3); margin-bottom: 30px; font-size: 0.9rem;">Sustav za upravljanje radionicom</p>
+            <p style="color:var(--text3); margin-bottom: 30px; font-size: 0.9rem;">Sistem za upravljanje radionicom</p>
             <div class="form-group">
                 <input type="password" id="loginPass" class="login-input" maxlength="4" placeholder="••••"
                     onkeyup="if(this.value.length==4) handleLogin()">
@@ -1184,7 +1248,7 @@
                         importJSONData(serverData);
                         localStorage.setItem('ta_last_sync', serverUpdate || new Date().toISOString());
 
-                        if (isAuto && localUpdate) toast('Podaci sinkronizirani sa oblaka', 'info');
+                        if (isAuto && localUpdate) console.log('Podaci sinkronizirani sa oblaka');
                         const activePage = document.querySelector('.page.active').id.replace('page-', '');
                         if (activePage) navigate(activePage);
                     }
@@ -1423,11 +1487,11 @@
 <div class="stat-card"><div class="stat-label">Neto Profit</div><div class="stat-value">${fmt(netProfit)}</div><div class="stat-sub">Nakon troškova</div></div>
 <div class="stat-card"><div class="stat-label">Vozila u Bazi</div><div class="stat-value">${vehicles.length}</div><div class="stat-sub">${workers.length} radnika</div></div>
 </div>
-<div style="display:grid;grid-template-columns:2fr 1fr;gap:20px">
+<div class="dash-grid">
 <div class="card"><div class="card-title"><i class="fas fa-clock"></i>Posljednje Popravke</div>
-${recent5.length ? `<div class="table-wrap"><table><thead><tr><th>Slika</th><th>Datum</th><th>Tablica</th><th>Vlasnik</th><th>Opis</th><th>Naplaćeno</th><th>Status</th></tr></thead><tbody>${recent5.map(r => {
+${recent5.length ? `<div class="table-wrap"><table><thead><tr><th class="hide-mobile">Slika</th><th>Datum</th><th>Tablica</th><th>Vlasnik</th><th>Opis</th><th>Naplaćeno</th><th>Status</th></tr></thead><tbody>${recent5.map(r => {
                 const thumb = r.images && r.images.length ? r.images[0] : null;
-                return `<tr><td>${thumb ? `<img src="${thumb}" style="width:40px;height:28px;border-radius:4px;object-fit:cover;border:1px solid var(--border)">` : `<div style="width:40px;height:28px;border-radius:4px;background:var(--card);display:flex;align-items:center;justify-content:center;border:1px solid var(--border)"><i class="fas fa-car" style="font-size:0.7rem;color:var(--text3)"></i></div>`}</td><td>${fmtDate(r.date)}</td><td><strong>${r.plate || '-'}</strong></td><td>${r.owner || '-'}</td><td>${(r.description || '').substring(0, 30)}</td><td>${fmt(r.charged || 0)}</td><td><span class="badge badge-${r.status === 'done' ? 'green' : r.status === 'active' ? 'yellow' : 'blue'}">${r.status === 'done' ? 'Završeno' : r.status === 'active' ? 'U toku' : 'Čeka'}</span></td></tr>`
+                return `<tr><td class="hide-mobile">${thumb ? `<img src="${thumb}" style="width:40px;height:28px;border-radius:4px;object-fit:cover;border:1px solid var(--border)">` : `<div style="width:40px;height:28px;border-radius:4px;background:var(--card);display:flex;align-items:center;justify-content:center;border:1px solid var(--border)"><i class="fas fa-car" style="font-size:0.7rem;color:var(--text3)"></i></div>`}</td><td>${fmtDate(r.date)}</td><td><strong>${r.plate || '-'}</strong></td><td>${r.owner || '-'}</td><td>${(r.description || '').substring(0, 30)}</td><td>${fmt(r.charged || 0)}</td><td><span class="badge badge-${r.status === 'done' ? 'green' : r.status === 'active' ? 'yellow' : 'blue'}">${r.status === 'done' ? 'Završeno' : r.status === 'active' ? 'U toku' : 'Čeka'}</span></td></tr>`
             }).join('')}</tbody></table></div>` : '<div class="empty-state"><i class="fas fa-wrench"></i><p>Nema popravki. Dodajte prvo vozilo.</p></div>'}
 </div>
 <div class="card"><div class="card-title"><i class="fas fa-bell"></i>Nadolazeći Podsjetnici</div>
@@ -1458,11 +1522,11 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
 
         function renderVehicleTable(vehicles) {
             if (!vehicles.length) return '<div class="empty-state"><i class="fas fa-car"></i><p>Nema vozila u bazi. Kliknite "Novo Vozilo" da dodate.</p></div>';
-            return `<div class="table-wrap"><table><thead><tr><th>Slika</th><th>Tablica</th><th>Vlasnik</th><th>Vozilo</th><th>Br. Registracije</th><th>Popravke</th><th>Ukupno Naplaćeno</th><th>Akcije</th></tr></thead><tbody>${vehicles.map(v => {
+            return `<div class="table-wrap"><table><thead><tr><th class="hide-mobile">Slika</th><th>Tablica</th><th>Vlasnik</th><th>Vozilo</th><th class="hide-mobile">VIN</th><th class="hide-mobile">Reg.</th><th>Usluge</th><th>Iznos</th><th>Akcije</th></tr></thead><tbody>${vehicles.map(v => {
                 const rc = (v.repairs || []).length;
                 const tot = (v.repairs || []).reduce((s, r) => s + Number(r.charged || 0), 0);
                 const thumb = v.images && v.images.length ? v.images[0] : null;
-                return `<tr style="cursor:pointer" onclick="navigate('vehicles','${v.id}')"><td>${thumb ? `<img src="${thumb}" style="width:50px;height:35px;border-radius:4px;object-fit:cover;border:1px solid var(--border)">` : `<div style="width:50px;height:35px;border-radius:4px;background:var(--card);display:flex;align-items:center;justify-content:center;border:1px solid var(--border)"><i class="fas fa-car" style="font-size:0.8rem;color:var(--text3)"></i></div>`}</td><td><strong>${v.plate}</strong></td><td>${v.owner}</td><td>${v.make} ${v.model} ${v.year || ''}<br><small style="color:var(--text3)">${v.vin || '-'}</small></td><td>${v.regNumber || '-'}</td><td><span class="badge badge-blue">${rc}</span></td><td>${fmt(tot)}</td><td><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openVehicleModal('${v.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteVehicle('${v.id}')"><i class="fas fa-trash"></i></button></td></tr>`
+                return `<tr style="cursor:pointer" onclick="navigate('vehicles','${v.id}')"><td class="hide-mobile">${thumb ? `<img src="${thumb}" style="width:50px;height:35px;border-radius:4px;object-fit:cover;border:1px solid var(--border)">` : `<div style="width:50px;height:35px;border-radius:4px;background:var(--card);display:flex;align-items:center;justify-content:center;border:1px solid var(--border)"><i class="fas fa-car" style="font-size:0.8rem;color:var(--text3)"></i></div>`}</td><td><strong>${v.plate}</strong></td><td>${v.owner}</td><td>${v.make} ${v.model}</td><td class="hide-mobile"><small>${v.vin || '-'}</small></td><td class="hide-mobile">${v.regNumber || '-'}</td><td><span class="badge badge-blue">${rc}</span></td><td><strong>${fmt(tot)}</strong></td><td><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();openVehicleModal('${v.id}')"><i class="fas fa-edit"></i></button></td></tr>`
             }).join('')}</tbody></table></div>`;
         }
 
@@ -1580,24 +1644,63 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
             }
         }
 
-        function handleVehicleImages(input) {
+        async function compressImage(dataUrl, maxWidth = 800, quality = 0.7) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.src = dataUrl;
+            });
+        }
+
+        async function handleVehicleImages(input) {
             if (!input.files || !input.files.length) return;
             window._vehicleImages = window._vehicleImages || [];
             const gallery = document.getElementById('fImgPreview');
-            Array.from(input.files).forEach(file => {
+
+            for (const file of Array.from(input.files)) {
                 const reader = new FileReader();
-                reader.onload = function (e) {
-                    window._vehicleImages.push(e.target.result);
-                    const div = document.createElement('div'); div.className = 'img-gallery-item';
-                    div.innerHTML = '<img src="' + e.target.result + '"><button class="img-remove" onclick="this.parentElement.remove();window._vehicleImages.splice(' + window._vehicleImages.length + ',1)"><i class="fas fa-times"></i></button>';
-                    gallery.appendChild(div);
-                }; reader.readAsDataURL(file);
-            });
+                const dataUrl = await new Promise((resolve) => {
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.readAsDataURL(file);
+                });
+
+                const compressed = await compressImage(dataUrl);
+                window._vehicleImages.push(compressed);
+
+                const div = document.createElement('div');
+                div.className = 'img-gallery-item';
+                div.innerHTML = `<img src="${compressed}"><button class="img-remove" onclick="removePreviewImg(${window._vehicleImages.length - 1}, this)"><i class="fas fa-times"></i></button>`;
+                gallery.appendChild(div);
+            }
         }
-        function removePreviewImg(idx) {
-            const gallery = document.getElementById('fImgPreview');
-            if (gallery.children[idx]) gallery.children[idx].remove();
-            if (window._vehicleImages) window._vehicleImages.splice(idx, 1);
+
+        function removePreviewImg(idx, btn) {
+            if (btn && btn.parentElement) btn.parentElement.remove();
+            if (window._vehicleImages) {
+                window._vehicleImages.splice(idx, 1);
+                // Refresh indexes for remaining remove buttons in standard modal flow
+                const gallery = document.getElementById('fImgPreview');
+                if (gallery) {
+                    Array.from(gallery.querySelectorAll('.img-remove')).forEach((b, i) => {
+                        b.setAttribute('onclick', `removePreviewImg(${i}, this)`);
+                    });
+                }
+            }
         }
         function showLightbox(src) {
             const lb = document.createElement('div'); lb.className = 'img-lightbox';
@@ -1675,14 +1778,14 @@ ${repairs.length ? `<div class="table-wrap"><table><thead><tr><th>Datum</th><th>
 <div class="stat-card"><div class="stat-label">Ostali Troškovi</div><div class="stat-value" style="color:#f87171">${fmt(totalExpenses)}</div></div>
 <div class="stat-card"><div class="stat-label">Neto Profit</div><div class="stat-value" style="color:${profit >= 0 ? '#34d399' : '#f87171'}">${fmt(profit)}</div></div>
 </div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-<div class="card"><div class="card-title"><i class="fas fa-chart-pie"></i>Raspodjela Prihoda</div><div class="chart-container"><canvas id="finPieChart"></canvas></div></div>
-<div class="card"><div class="card-title"><i class="fas fa-chart-area"></i>Mjesečni Trend</div><div class="chart-container"><canvas id="finLineChart"></canvas></div></div>
-</div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-<div class="card"><div class="card-title"><i class="fas fa-wrench"></i>Zarada po Tipu Popravke</div><div class="chart-container"><canvas id="finRepairChart"></canvas></div></div>
-<div class="card"><div class="card-title"><i class="fas fa-users"></i>Zarada po Radniku</div><div class="chart-container"><canvas id="finWorkerChart"></canvas></div></div>
-</div>
+            <div class="dash-grid">
+                <div class="card"><div class="card-title"><i class="fas fa-chart-pie"></i>Raspodjela Prihoda</div><div class="chart-container"><canvas id="finPieChart"></canvas></div></div>
+                <div class="card"><div class="card-title"><i class="fas fa-chart-area"></i>Mjesečni Trend</div><div class="chart-container"><canvas id="finLineChart"></canvas></div></div>
+            </div>
+            <div class="dash-grid">
+                <div class="card"><div class="card-title"><i class="fas fa-wrench"></i>Zarada po Tipu Popravke</div><div class="chart-container"><canvas id="finRepairChart"></canvas></div></div>
+                <div class="card"><div class="card-title"><i class="fas fa-users"></i>Zarada po Radniku</div><div class="chart-container"><canvas id="finWorkerChart"></canvas></div></div>
+            </div>
 <div class="card"><div class="card-title"><i class="fas fa-receipt"></i>Troškovi Radionice</div>
 <div class="search-box"><input class="search-input" id="expSearch" placeholder="Pretraži troškove..." oninput="filterExpenses()"><select class="search-input" style="flex:0 0 160px" id="expCat" onchange="filterExpenses()"><option value="">Sve Kategorije</option><option value="Najam">Najam</option><option value="Struja">Struja</option><option value="Alat">Alat</option><option value="Materijal">Materijal</option><option value="Plata">Plata</option><option value="Ostalo">Ostalo</option></select></div>
 <div id="expensesList">${renderExpenseTable(expenses)}</div></div>`;
@@ -1692,7 +1795,7 @@ ${repairs.length ? `<div class="table-wrap"><table><thead><tr><th>Datum</th><th>
         function renderExpenseTable(expenses) {
             if (!expenses.length) return '<div class="empty-state"><i class="fas fa-receipt"></i><p>Nema troškova</p></div>';
             const sorted = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
-            return `<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Kategorija</th><th>Opis</th><th>Iznos</th><th>Akcije</th></tr></thead><tbody>${sorted.map(e => `<tr><td>${fmtDate(e.date)}</td><td><span class="badge badge-yellow">${e.category}</span></td><td>${e.description}</td><td><strong>${fmt(e.amount)}</strong></td><td><button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')"><i class="fas fa-trash"></i></button></td></tr>`).join('')}</tbody></table></div>`;
+            return `<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Kat.</th><th class="hide-mobile">Opis</th><th>Iznos</th><th>Akcije</th></tr></thead><tbody>${sorted.map(e => `<tr><td>${fmtDate(e.date)}</td><td><span class="badge badge-yellow" style="font-size:0.65rem">${e.category}</span></td><td class="hide-mobile">${e.description}</td><td><strong>${fmt(e.amount)}</strong></td><td><button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')"><i class="fas fa-trash"></i></button></td></tr>`).join('')}</tbody></table></div>`;
         }
 
         function filterExpenses() {
