@@ -972,9 +972,8 @@
         }
 
         async function loadFromGoogleSheets(isAuto = false) {
-            console.log('Provjera oblaka... (isAuto: ' + isAuto + ')');
             try {
-                const response = await fetch(GS_URL + '?action=get');
+                const response = await fetch(GS_URL + '?action=get&t=' + Date.now());
                 const result = await response.json();
 
                 if (result.status === 'success' && result.data) {
@@ -982,26 +981,17 @@
                     const serverData = result.data;
                     const serverUpdate = serverData.lastUpdate;
 
-                    console.log('Lokalni update:', localUpdate);
-                    console.log('Server update:', serverUpdate);
-
-                    // LOGIKA: Učitaj ako:
-                    // 1. Nemamo nikakav lokalni podatak (prvi put na uređaju)
-                    // 2. Server ima noviju verziju nego što smo zadnji put sinkronizirali
                     if (!localUpdate || (serverUpdate && new Date(serverUpdate) > new Date(localUpdate))) {
-                        console.log('Učitavam novije podatke sa servera...');
                         importJSONData(serverData);
                         localStorage.setItem('ta_last_sync', serverUpdate || new Date().toISOString());
 
-                        toast('Podaci osvježeni iz Google Tabele', 'info');
+                        if (isAuto && localUpdate) toast('Podaci sinkronizirani sa oblaka', 'info');
                         const activePage = document.querySelector('.page.active').id.replace('page-', '');
-                        navigate(activePage);
-                    } else {
-                        console.log('Lokalni podaci su već najnoviji.');
+                        if (activePage) navigate(activePage);
                     }
                 }
             } catch (e) {
-                console.error('Greška pri automatskom učitavanju:', e);
+                console.error('Cloud load error:', e);
             }
         }
 
