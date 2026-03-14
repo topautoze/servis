@@ -1231,9 +1231,6 @@
                 
                 console.log('Automatsko slanje završeno (pozadinsko)');
                 localStorage.setItem('ta_last_sync', fullData.lastUpdate);
-                
-                // Force reload after 2 seconds to ensure sync completed
-                setTimeout(() => loadFromGoogleSheets(true), 2000);
             } catch (e) {
                 console.error('Auto-sync error:', e);
             }
