@@ -1253,9 +1253,11 @@
                         importJSONData(serverData);
                         localStorage.setItem('ta_last_sync', serverUpdate || new Date().toISOString());
 
-                        if (isAuto && localUpdate) {
+                        // Only show toast on manual refresh, not auto
+                        if (!isAuto) {
+                            toast('Podaci ažurirani', 'success');
+                        } else {
                             console.log('Podaci sinkronizirani sa oblaka');
-                            toast('Podaci ažurirani', 'info');
                         }
                         
                         // Refresh current page view
