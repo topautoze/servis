@@ -1199,7 +1199,11 @@
         function fmtDate(d) { if (!d) return '-'; return new Date(d).toLocaleDateString('bs-BA') }
         function toast(msg, type = 'success') { const t = document.createElement('div'); t.className = 'toast toast-' + type; t.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : 'info-circle') + '"></i>' + msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3000) }
         function getVehicles() { return DB.get('vehicles') || [] }
-        function saveVehicles(v) { DB.set('vehicles', v); syncToGoogleSheets(); }
+        function saveVehicles(v) { 
+            DB.set('vehicles', v); 
+            console.log('Saving vehicles with repairs:', v.map(vehicle => ({ plate: vehicle.plate, repairs: vehicle.repairs?.length || 0 })));
+            syncToGoogleSheets(); 
+        }
         function getWorkers() { return DB.get('workers') || [] }
         function saveWorkers(w) { DB.set('workers', w); syncToGoogleSheets(); }
         function getExpenses() { return DB.get('expenses') || [] }
@@ -1219,6 +1223,14 @@
                 reminders: getReminders(),
                 lastUpdate: new Date().toISOString()
             };
+
+            console.log('Syncing to cloud:', {
+                vehiclesCount: fullData.vehicles.length,
+                totalRepairs: fullData.vehicles.reduce((sum, v) => sum + (v.repairs?.length || 0), 0),
+                workersCount: fullData.workers.length,
+                expensesCount: fullData.expenses.length,
+                remindersCount: fullData.reminders.length
+            });
 
             try {
                 // Use fetch without no-cors to ensure data is sent
