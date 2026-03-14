@@ -1253,27 +1253,27 @@
                         // Only show toast on manual refresh, not auto
                         if (!isAuto) {
                             toast('Podaci ažurirani', 'success');
-                        } else {
-                            console.log('Podaci sinkronizirani sa oblaka');
-                        }
-                        
-                        // Refresh current page view
-                        const activePage = document.querySelector('.page.active');
-                        if (activePage) {
-                            const pageId = activePage.id.replace('page-', '');
-                            if (pageId === 'vehicles') {
-                                const urlParams = new URLSearchParams(window.location.hash.substring(1));
-                                const viewId = urlParams.get('id');
-                                renderVehicles(viewId);
-                            } else if (pageId === 'dashboard') {
-                                renderDashboard();
-                            } else if (pageId === 'finances') {
-                                renderFinances();
-                            } else if (pageId === 'reminders') {
-                                renderRemindersPage();
-                            } else if (pageId === 'workers') {
-                                renderWorkers();
+                            
+                            // Only refresh page view on manual refresh
+                            const activePage = document.querySelector('.page.active');
+                            if (activePage) {
+                                const pageId = activePage.id.replace('page-', '');
+                                if (pageId === 'vehicles') {
+                                    const urlParams = new URLSearchParams(window.location.hash.substring(1));
+                                    const viewId = urlParams.get('id');
+                                    renderVehicles(viewId);
+                                } else if (pageId === 'dashboard') {
+                                    renderDashboard();
+                                } else if (pageId === 'finances') {
+                                    renderFinances();
+                                } else if (pageId === 'reminders') {
+                                    renderRemindersPage();
+                                } else if (pageId === 'workers') {
+                                    renderWorkers();
+                                }
                             }
+                        } else {
+                            console.log('Podaci sinkronizirani sa oblaka (pozadina)');
                         }
                     }
                 }
