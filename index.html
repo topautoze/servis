@@ -2276,7 +2276,7 @@ ${repairs.length ? `
 
             pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-chart-line"></i>Finansije</h2><button class="btn btn-primary" onclick="openExpenseModal()"><i class="fas fa-plus"></i>Novi Trošak</button></div>
 <div class="stat-cards">
-<div class="stat-card"><div class="stat-label">Ukupna Naplata</div><div class="stat-value" style="color:#60a5fa">${fmt(totalEarned)}</div><div class="stat-sub">Sve naplaćeno klijentima</div></div>
+<div class="stat-card"><div class="stat-label">Ukupni Profit</div><div class="stat-value" style="color:#34d399">${fmt(totalPartsProfit + totalLaborProfit)}</div><div class="stat-sub">Dijelovi + Rad</div></div>
 <div class="stat-card"><div class="stat-label">Profit od Dijelova</div><div class="stat-value" style="color:#f59e0b">${fmt(totalPartsProfit)}</div><div class="stat-sub">Rabat na nabavku</div></div>
 <div class="stat-card"><div class="stat-label">Profit od Rada</div><div class="stat-value" style="color:#60a5fa">${fmt(totalLaborProfit)}</div><div class="stat-sub">Radni sati</div></div>
 <div class="stat-card"><div class="stat-label">Neto Profit</div><div class="stat-value" style="color:${netProfit >= 0 ? '#34d399' : '#f87171'}">${fmt(netProfit)}</div><div class="stat-sub">Nakon troškova radionice</div></div>
