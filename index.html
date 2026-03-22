@@ -1255,6 +1255,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const DOC = db.collection('topauto').doc('data');
+        const IMAGES = db.collection('topauto_images'); // separate collection, one doc per vehicle
 
         // ===== DATA LAYER =====
         // localStorage as fast local cache, Firestore as source of truth
@@ -1282,30 +1283,61 @@
         function getExpenses() { return DB.get('expenses') || [] }
         function getReminders() { return DB.get('reminders') || [] }
 
-        function saveVehicles(v) { DB.set('vehicles', v); syncToFirebase(); }
+        function saveVehicles(v, changedIds) { DB.set('vehicles', v); syncToFirebase(changedIds); }
         function saveWorkers(w) { DB.set('workers', w); syncToFirebase(); }
         function saveExpenses(e) { DB.set('expenses', e); syncToFirebase(); }
         function saveReminders(r) { DB.set('reminders', r); syncToFirebase(); }
 
         // ===== FIREBASE SYNC =====
+        // Images are stored in a separate Firestore collection (topauto_images)
+        // keyed by vehicle ID to stay under the 1MB document limit.
+        // Main doc stores vehicles with images stripped — images are merged back on load.
+
+        function stripImages(vehicles) {
+            return vehicles.map(v => ({ ...v, images: [] }));
+        }
+
         let syncTimer = null;
-        function syncToFirebase() {
-            // Debounce — wait 500ms after last change before writing
+        let imageSyncQueue = {}; // vehicleId -> images[], flushed on debounce
+
+        function syncToFirebase(changedVehicleIds) {
+            // Queue any vehicle image changes
+            if (changedVehicleIds) {
+                const vehicles = getVehicles();
+                changedVehicleIds.forEach(id => {
+                    const v = vehicles.find(x => x.id === id);
+                    imageSyncQueue[id] = v ? (v.images || []) : null; // null = deleted
+                });
+            }
             clearTimeout(syncTimer);
             syncTimer = setTimeout(async () => {
                 try {
+                    // 1. Save main data doc (no images)
                     await DOC.set({
-                        vehicles: getVehicles(),
+                        vehicles: stripImages(getVehicles()),
                         workers: getWorkers(),
                         expenses: getExpenses(),
                         reminders: getReminders(),
                         lastUpdate: new Date().toISOString()
                     });
+
+                    // 2. Save/delete image docs for changed vehicles
+                    const batch = db.batch();
+                    for (const [id, images] of Object.entries(imageSyncQueue)) {
+                        const ref = IMAGES.doc(id);
+                        if (images === null) {
+                            batch.delete(ref);
+                        } else {
+                            batch.set(ref, { images });
+                        }
+                    }
+                    await batch.commit();
+                    imageSyncQueue = {};
                 } catch(e) {
                     console.error('Firebase sync error:', e);
                     toast('Greška pri sinkronizaciji!', 'error');
                 }
-            }, 500);
+            }, 800);
         }
 
         async function loadFromFirebase() {
@@ -1313,7 +1345,17 @@
                 const snap = await DOC.get();
                 if (snap.exists) {
                     const data = snap.data();
-                    if (data.vehicles) DB.set('vehicles', data.vehicles);
+                    if (data.vehicles) {
+                        // Fetch all image docs and merge into vehicles
+                        const imgSnaps = await IMAGES.get();
+                        const imgMap = {};
+                        imgSnaps.forEach(d => { imgMap[d.id] = d.data().images || []; });
+                        const vehicles = data.vehicles.map(v => ({
+                            ...v,
+                            images: imgMap[v.id] || []
+                        }));
+                        DB.set('vehicles', vehicles);
+                    }
                     if (data.workers) DB.set('workers', data.workers);
                     if (data.expenses) DB.set('expenses', data.expenses);
                     if (data.reminders) DB.set('reminders', data.reminders);
@@ -1667,7 +1709,11 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
 
         function openVehicleModal(editId) {
             const v = editId ? getVehicles().find(x => x.id === editId) : null;
-            const workers = getWorkers().filter(w => w.active);
+
+            // Always initialize _vehicleImages from existing vehicle images (or empty for new)
+            // This ensures edits preserve existing images and new ones are appended correctly
+            window._vehicleImages = v && v.images ? [...v.images] : [];
+
             showModal(`${v ? 'Uredi' : 'Novo'} Vozilo`, `
 <div class="ocr-zone" onclick="document.getElementById('ocrInput').click()"><i class="fas fa-camera"></i><p style="color:var(--text3);font-size:.82rem">Foto tablice ili saobraćajne dozvole — automatski popunjava polja</p><input type="file" id="ocrInput" accept="image/*" style="display:none" onchange="handleOCR(this)"></div>
 <div class="form-row"><div class="form-group"><label>Registarska Tablica *</label><input id="fPlate" value="${v ? v.plate : ''}" placeholder="npr. A12-B-345"></div><div class="form-group"><label>Broj Šasije (VIN)</label><input id="fVin" value="${v ? v.vin || '' : ''}" placeholder="17 karaktera"></div></div>
@@ -1675,27 +1721,59 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
 <div class="form-row"><div class="form-group"><label>Telefon</label><input id="fPhone" value="${v ? v.phone || '' : ''}" placeholder="06x xxx xxx"></div><div class="form-group"><label>Email</label><input id="fEmail" value="${v ? v.email || '' : ''}" placeholder="email@primjer.com"></div></div>
 <div class="form-row"><div class="form-group"><label>Marka *</label><input id="fMake" value="${v ? v.make : ''}" placeholder="npr. Volkswagen"></div><div class="form-group"><label>Model *</label><input id="fModel" value="${v ? v.model : ''}" placeholder="npr. Golf 7"></div></div>
 <div class="form-row"><div class="form-group"><label>Godina</label><input type="number" id="fYear" value="${v ? v.year || '' : ''}" placeholder="2020"></div><div class="form-group"><label>Kilometraža</label><input type="number" id="fKm" value="${v ? v.km || '' : ''}" placeholder="150000"></div></div>
-<div class="form-group"><label>Slike Vozila</label><input type="file" id="fImages" accept="image/*" multiple onchange="handleVehicleImages(this)"><div class="img-gallery" id="fImgPreview">${v && v.images ? v.images.map((img, i) => '<div class="img-gallery-item"><img src="' + img + '"><button class="img-remove" onclick="removePreviewImg(' + i + ')"><i class="fas fa-times"></i></button></div>').join('') : ''}</div></div>
+<div class="form-group"><label>Slike Vozila</label><input type="file" id="fImages" accept="image/*" multiple onchange="handleVehicleImages(this)"><div class="img-gallery" id="fImgPreview">${window._vehicleImages.map((img, i) => '<div class="img-gallery-item"><img src="' + img + '"><button class="img-remove" onclick="removePreviewImg(' + i + ')"><i class="fas fa-times"></i></button></div>').join('')}</div></div>
 <div class="form-group"><label>Napomene</label><textarea id="fNotes" placeholder="Dodatne bilješke...">${v ? v.notes || '' : ''}</textarea></div>
 `, () => {
                 const plate = document.getElementById('fPlate').value.trim();
                 const owner = document.getElementById('fOwner').value.trim();
                 const make = document.getElementById('fMake').value.trim();
                 const model = document.getElementById('fModel').value.trim();
-                if (!plate || !owner || !make || !model) { toast('Popunite obavezna polja!', 'error'); return false }
+                if (!plate || !owner || !make || !model) { toast('Popunite obavezna polja!', 'error'); return false; }
+
                 const vehicles = getVehicles();
-                const imgData = window._vehicleImages || (v ? v.images : null) || [];
-                if (v) { const idx = vehicles.findIndex(x => x.id === v.id); vehicles[idx] = { ...vehicles[idx], plate, owner, make, model, regNumber: document.getElementById('fReg').value.trim(), vin: document.getElementById('fVin').value.trim(), phone: document.getElementById('fPhone').value.trim(), email: document.getElementById('fEmail').value.trim(), year: document.getElementById('fYear').value, km: document.getElementById('fKm').value, notes: document.getElementById('fNotes').value, images: imgData }; }
-                else { vehicles.push({ id: uid(), plate, owner, make, model, regNumber: document.getElementById('fReg').value.trim(), vin: document.getElementById('fVin').value.trim(), phone: document.getElementById('fPhone').value.trim(), email: document.getElementById('fEmail').value.trim(), year: document.getElementById('fYear').value, km: document.getElementById('fKm').value, notes: document.getElementById('fNotes').value, images: imgData, repairs: [], createdAt: Date.now() }); }
+                // Use _vehicleImages which is always up to date (initialized above, appended by handleVehicleImages)
+                const imgData = [...(window._vehicleImages || [])];
                 window._vehicleImages = null;
-                saveVehicles(vehicles); toast(v ? 'Vozilo ažurirano!' : 'Vozilo dodano!'); renderVehicles(); return true;
+
+                if (v) {
+                    const idx = vehicles.findIndex(x => x.id === v.id);
+                    vehicles[idx] = { ...vehicles[idx], plate, owner, make, model,
+                        regNumber: document.getElementById('fReg').value.trim(),
+                        vin: document.getElementById('fVin').value.trim(),
+                        phone: document.getElementById('fPhone').value.trim(),
+                        email: document.getElementById('fEmail').value.trim(),
+                        year: document.getElementById('fYear').value,
+                        km: document.getElementById('fKm').value,
+                        notes: document.getElementById('fNotes').value,
+                        images: imgData };
+                } else {
+                    vehicles.push({ id: uid(), plate, owner, make, model,
+                        regNumber: document.getElementById('fReg').value.trim(),
+                        vin: document.getElementById('fVin').value.trim(),
+                        phone: document.getElementById('fPhone').value.trim(),
+                        email: document.getElementById('fEmail').value.trim(),
+                        year: document.getElementById('fYear').value,
+                        km: document.getElementById('fKm').value,
+                        notes: document.getElementById('fNotes').value,
+                        images: imgData, repairs: [], createdAt: Date.now() });
+                }
+                const savedId = v ? v.id : vehicles[vehicles.length - 1]?.id;
+                saveVehicles(vehicles, savedId ? [savedId] : []);
+                toast(v ? 'Vozilo ažurirano!' : 'Vozilo dodano!');
+                renderVehicles();
+                return true;
             });
         }
 
         function deleteVehicle(id) { 
-            if (!confirm('Obrisati ovo vozilo i sve popravke? Ova akcija se ne može poništiti!')) return; 
-            const v = getVehicles().filter(x => x.id !== id); 
-            saveVehicles(v); 
+            if (!confirm('Obrisati ovo vozilo i sve popravke? Ova akcija se ne može poništiti!')) return;
+            const vehicles = getVehicles().map(v => v.id === id ? null : v).filter(Boolean);
+            // Pass id with null images to trigger image doc deletion
+            const all = getVehicles().filter(x => x.id !== id);
+            DB.set('vehicles', all);
+            // Mark image doc for deletion via queue
+            imageSyncQueue[id] = null;
+            syncToFirebase();
             toast('Vozilo obrisano!', 'success'); 
             setTimeout(() => renderVehicles(), 500);
         }
@@ -1955,37 +2033,38 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
 
         async function handleVehicleImages(input) {
             if (!input.files || !input.files.length) return;
-            window._vehicleImages = window._vehicleImages || [];
+            // _vehicleImages is always initialized by openVehicleModal — just append
+            if (!Array.isArray(window._vehicleImages)) window._vehicleImages = [];
             const gallery = document.getElementById('fImgPreview');
 
             for (const file of Array.from(input.files)) {
-                const reader = new FileReader();
-                const dataUrl = await new Promise((resolve) => {
-                    reader.onload = (e) => resolve(e.target.result);
+                const dataUrl = await new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onload = e => resolve(e.target.result);
                     reader.readAsDataURL(file);
                 });
-
                 const compressed = await compressImage(dataUrl);
                 window._vehicleImages.push(compressed);
 
+                const idx = window._vehicleImages.length - 1;
                 const div = document.createElement('div');
                 div.className = 'img-gallery-item';
-                div.innerHTML = `<img src="${compressed}"><button class="img-remove" onclick="removePreviewImg(${window._vehicleImages.length - 1}, this)"><i class="fas fa-times"></i></button>`;
+                div.innerHTML = `<img src="${compressed}"><button class="img-remove" onclick="removePreviewImg(${idx})"><i class="fas fa-times"></i></button>`;
                 gallery.appendChild(div);
             }
+            // Reset file input so same file can be re-added if needed
+            input.value = '';
         }
 
-        function removePreviewImg(idx, btn) {
-            if (btn && btn.parentElement) btn.parentElement.remove();
-            if (window._vehicleImages) {
-                window._vehicleImages.splice(idx, 1);
-                // Refresh indexes for remaining remove buttons in standard modal flow
-                const gallery = document.getElementById('fImgPreview');
-                if (gallery) {
-                    Array.from(gallery.querySelectorAll('.img-remove')).forEach((b, i) => {
-                        b.setAttribute('onclick', `removePreviewImg(${i}, this)`);
-                    });
-                }
+        function removePreviewImg(idx) {
+            if (!Array.isArray(window._vehicleImages)) return;
+            window._vehicleImages.splice(idx, 1);
+            // Re-render the whole gallery from the updated array
+            const gallery = document.getElementById('fImgPreview');
+            if (gallery) {
+                gallery.innerHTML = window._vehicleImages.map((img, i) =>
+                    `<div class="img-gallery-item"><img src="${img}"><button class="img-remove" onclick="removePreviewImg(${i})"><i class="fas fa-times"></i></button></div>`
+                ).join('');
             }
         }
         function showLightbox(src) {
@@ -2392,7 +2471,7 @@ ${workers.map(w => {
             document.getElementById('modalSaveBtn').onclick = () => { if (onSave() !== false) closeModal() };
             document.getElementById('modalOverlay').onclick = e => { if (e.target.id === 'modalOverlay') closeModal() };
         }
-        function closeModal() { const m = document.getElementById('modal-root'); if (m) m.innerHTML = ''; }
+        function closeModal() { const m = document.getElementById('modal-root'); if (m) m.innerHTML = ''; window._vehicleImages = null; }
 
         // Start checking reminders after initialization
         function startReminderCheck() {
