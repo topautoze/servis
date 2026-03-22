@@ -1666,8 +1666,7 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
             const v = editId ? getVehicles().find(x => x.id === editId) : null;
             const workers = getWorkers().filter(w => w.active);
             showModal(`${v ? 'Uredi' : 'Novo'} Vozilo`, `
-<div class="ocr-zone" data-type="plate" onclick="document.getElementById('ocrInput').click()"><i class="fas fa-camera"></i><p style="color:var(--text3);font-size:.82rem">Foto tablice → automatski popuni tablicu</p><input type="file" id="ocrInput" accept="image/*" capture="environment" style="display:none" onchange="handleOCR(this)"></div>
-<div class="ocr-zone" data-type="reg" onclick="document.getElementById('ocrRegInput').click()" style="margin-top:-6px"><i class="fas fa-id-card"></i><p style="color:var(--text3);font-size:.82rem">Foto saobraćajne dozvole → popuni broj reg., VIN, marku...</p><input type="file" id="ocrRegInput" accept="image/*" capture="environment" style="display:none" onchange="handleRegOCR(this)"></div>
+<div class="ocr-zone" onclick="document.getElementById('ocrInput').click()"><i class="fas fa-camera"></i><p style="color:var(--text3);font-size:.82rem">Foto tablice ili saobraćajne dozvole — automatski popunjava polja</p><input type="file" id="ocrInput" accept="image/*" capture="environment" style="display:none" onchange="handleOCR(this)"></div>
 <div class="form-row"><div class="form-group"><label>Registarska Tablica *</label><input id="fPlate" value="${v ? v.plate : ''}" placeholder="npr. A12-B-345"></div><div class="form-group"><label>Broj Šasije (VIN)</label><input id="fVin" value="${v ? v.vin || '' : ''}" placeholder="17 karaktera"></div></div>
 <div class="form-row"><div class="form-group"><label>Vlasnik *</label><input id="fOwner" value="${v ? v.owner : ''}" placeholder="Ime i prezime"></div><div class="form-group"><label>Broj Registracije</label><input id="fReg" value="${v ? v.regNumber || '' : ''}" placeholder="Saobraćajna dozvola"></div></div>
 <div class="form-row"><div class="form-group"><label>Telefon</label><input id="fPhone" value="${v ? v.phone || '' : ''}" placeholder="06x xxx xxx"></div><div class="form-group"><label>Email</label><input id="fEmail" value="${v ? v.email || '' : ''}" placeholder="email@primjer.com"></div></div>
@@ -1717,28 +1716,82 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
         }
 
         // Extract registration number from saobraćajna dozvola text
-        // BIH reg numbers look like: BH 1234567, or standalone 7-digit numbers near keywords
-        function extractRegNumber(text) {
-            const t = text.toUpperCase();
-            // Pattern 1: "BH" followed by 7 digits (with optional space/dash)
-            const bh = t.match(/BH[\s-]?(\d{7})/);
-            if (bh) return 'BH ' + bh[1];
-            // Pattern 2: label keywords near a number
-            const labeled = t.match(/(?:BROJ|BR\.?|REG(?:ISTRACI[JY]A)?|DOZVOL[AE])[\s:]*([A-Z0-9]{5,12})/);
-            if (labeled) return labeled[1].trim();
-            // Pattern 3: standalone 7-digit number
-            const sevenDigit = t.match(/\b(\d{7})\b/);
-            if (sevenDigit) return sevenDigit[1];
+        // Extract BIH plate from OCR text — strips "BIH" prefix, handles spaces around dashes
+        function extractPlateFromText(text) {
+            // Remove "BIH" prefix that appears on the blue strip of the plate
+            const t = text.toUpperCase().replace(/\bBIH\b/g, '').replace(/\s+/g, '');
+            // Strict BIH format: letter + 2 digits + dash + letter + dash + 3 digits
+            // Also matches without dashes (OCR sometimes misses them)
+            const m = t.match(/([A-Z]\d{2})-?([A-Z])-?(\d{3})/);
+            if (m) return `${m[1]}-${m[2]}-${m[3]}`;
             return null;
         }
 
-        // Extract plate from general OCR text
-        function extractPlateFromText(text) {
-            const t = text.toUpperCase().replace(/\s/g, '');
-            // BIH format: letter + 2 digits + dash + letter + dash + 3 digits
-            const strict = t.match(/[A-Z]\d{2}-?[A-Z]-?\d{3}/);
-            if (strict) return normalizePlate(strict[0]);
-            return null;
+        // Parse BIH saobraćajna dozvola — uses the exact field codes printed on the document
+        // (A) = registarska oznaka (plate)
+        // (C.1.1) = prezime, (C.1.2) = ime
+        // (D.1) = marka, (D.3) = model
+        // (E) = VIN broj šasije
+        // (8) = godina proizvodnje
+        // (3) = broj registracije (reg number issued by MUP)
+        function parseRegistrationDoc(text) {
+            const t = text.replace(/\r/g, '');
+            const result = {};
+
+            // Helper: get value on same line after a label, or on the next non-empty line
+            function after(pattern) {
+                const m = t.match(pattern);
+                return m ? (m[1] || '').trim() : null;
+            }
+
+            // (A) Registarska oznaka — plate
+            // Appears as "M03-E-189" inside a box after "(A)" label
+            const plateRaw = after(/\(A\)[^\n]*\n([^\n]+)/);
+            if (plateRaw) result.plate = extractPlateFromText(plateRaw) || extractPlateFromText(plateRaw.replace(/\s/g,''));
+
+            // Fallback: scan whole text for plate pattern (also handles plate-only photo)
+            if (!result.plate) result.plate = extractPlateFromText(t);
+
+            // (C.1.1) Prezime
+            const surname = after(/\(C\.1\.1\)[^\n]*\n([^\n]+)/);
+            if (surname) result.surname = surname.replace(/[^A-ZČĆŽŠĐA-Z\s]/gi, '').trim();
+
+            // (C.1.2) Ime
+            const name = after(/\(C\.1\.2\)[^\n]*\n([^\n]+)/);
+            if (name) result.name = name.replace(/[^A-ZČĆŽŠĐA-Z\s]/gi, '').trim();
+
+            // (D.1) Marka
+            const make = after(/\(D\.1\)[^\n]*\n([^\n]+)/);
+            if (make) result.make = make.replace(/[^A-Za-z\s\-]/g, '').trim();
+
+            // (D.3) Model — number/alphanumeric on its own line after (D.3)
+            const model = after(/\(D\.3\)[^\n]*\n([^\n]+)/);
+            if (model) result.model = model.trim();
+
+            // (E) VIN — 17 chars, alphanumeric, no I/O/Q
+            const vinLine = after(/\(E\)[^\n]*\n([^\n]+)/);
+            if (vinLine) {
+                const vin = vinLine.match(/[A-HJ-NPR-Z0-9]{17}/i);
+                if (vin) result.vin = vin[0].toUpperCase();
+            }
+            // Fallback: scan whole text for 17-char VIN
+            if (!result.vin) {
+                const vin = t.match(/\b[A-HJ-NPR-Z0-9]{17}\b/i);
+                if (vin) result.vin = vin[0].toUpperCase();
+            }
+
+            // (8) Godina proizvodnje — 4-digit year after "(8)"
+            const yearLine = after(/\(8\)[^\n]*\n([^\n]+)/);
+            if (yearLine) {
+                const yr = yearLine.match(/\b(19|20)\d{2}\b/);
+                if (yr) result.year = yr[0];
+            }
+
+            // (3) Broj registracije (MUP number, e.g. A58K383)
+            const regLine = after(/\(3\)[^\n]*\n([^\n]+)/);
+            if (regLine) result.regNumber = regLine.trim().replace(/\s+/g, '');
+
+            return result;
         }
 
         // Core OCR.space call — works for both plate photos and document photos
@@ -1785,92 +1838,52 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
             return data.ParsedResults?.[0]?.ParsedText || '';
         }
 
-        // Called from plate OCR zone (foto tablice)
+        // Single smart OCR handler — auto-detects plate photo vs registration document
         async function handleOCR(input) {
             if (!input.files || !input.files[0]) return;
-            const zone = document.querySelector('.ocr-zone[data-type="plate"]') || document.querySelector('.ocr-zone');
+            const zone = document.querySelector('.ocr-zone');
             const originalContent = zone.innerHTML;
             zone.style.pointerEvents = 'none';
-            zone.innerHTML = '<i class="fas fa-spinner fa-spin"></i><p style="color:var(--text3);font-size:.82rem">Prepoznavanje tablice...</p>';
+            zone.innerHTML = '<i class="fas fa-spinner fa-spin"></i><p style="color:var(--text3);font-size:.82rem">Čitanje slike...</p>';
             try {
                 const text = await ocrSpaceRecognize(input.files[0]);
                 if (text === null) return; // no key, already toasted
-                const plate = extractPlateFromText(text);
-                if (plate) {
-                    document.getElementById('fPlate').value = plate;
-                    toast('Tablica prepoznata: ' + plate, 'success');
+                console.log('OCR raw:', text);
+
+                const parsed = parseRegistrationDoc(text);
+                let filled = 0;
+
+                // Detect if this looks like a full registration document
+                // (has at least 2 of: VIN, make, year, surname — not just a plate)
+                const isDoc = [parsed.vin, parsed.make, parsed.year, parsed.surname]
+                    .filter(Boolean).length >= 2;
+
+                if (isDoc) {
+                    // Registration document — fill all available fields
+                    if (parsed.plate) { document.getElementById('fPlate').value = parsed.plate; filled++; }
+                    if (parsed.vin)   { document.getElementById('fVin').value = parsed.vin; filled++; }
+                    if (parsed.make)  { document.getElementById('fMake').value = parsed.make; filled++; }
+                    if (parsed.model) { document.getElementById('fModel').value = parsed.model; filled++; }
+                    if (parsed.year)  { document.getElementById('fYear').value = parsed.year; filled++; }
+                    if (parsed.regNumber) { document.getElementById('fReg').value = parsed.regNumber; filled++; }
+                    if (parsed.surname || parsed.name) {
+                        const fullName = [parsed.surname, parsed.name].filter(Boolean).join(' ');
+                        if (!document.getElementById('fOwner').value) {
+                            document.getElementById('fOwner').value = fullName;
+                            filled++;
+                        }
+                    }
+                    toast(`Saobraćajna pročitana — popunjeno ${filled} polja!`, 'success');
+                } else if (parsed.plate) {
+                    // Plain plate photo
+                    document.getElementById('fPlate').value = parsed.plate;
+                    toast('Tablica prepoznata: ' + parsed.plate, 'success');
                 } else {
-                    // Put raw text so user can copy what was found
-                    const raw = text.replace(/\n/g, ' ').trim().substring(0, 30);
-                    toast('Nije prepoznat format tablice. Pronađeno: "' + (raw || 'ništa') + '"', 'info');
+                    const raw = text.replace(/\n/g, ' ').trim().substring(0, 40);
+                    toast('Nije prepoznato. Pronađeno: "' + (raw || 'ništa') + '"', 'info');
                 }
             } catch (err) {
                 console.error('OCR error:', err);
-                toast('OCR greška: ' + err.message, 'error');
-            } finally {
-                zone.innerHTML = originalContent;
-                zone.style.pointerEvents = 'auto';
-            }
-        }
-
-        // Called from registration document OCR zone (foto saobraćajne)
-        async function handleRegOCR(input) {
-            if (!input.files || !input.files[0]) return;
-            const zone = document.querySelector('.ocr-zone[data-type="reg"]');
-            const originalContent = zone.innerHTML;
-            zone.style.pointerEvents = 'none';
-            zone.innerHTML = '<i class="fas fa-spinner fa-spin"></i><p style="color:var(--text3);font-size:.82rem">Čitanje saobraćajne dozvole...</p>';
-            try {
-                const text = await ocrSpaceRecognize(input.files[0]);
-                if (text === null) return;
-                console.log('Reg OCR raw:', text);
-
-                let filled = 0;
-
-                // Try to fill registration number
-                const regNum = extractRegNumber(text);
-                if (regNum) {
-                    document.getElementById('fReg').value = regNum;
-                    filled++;
-                }
-
-                // Try to fill plate if empty
-                const plate = extractPlateFromText(text);
-                if (plate && !document.getElementById('fPlate').value) {
-                    document.getElementById('fPlate').value = plate;
-                    filled++;
-                }
-
-                // Try to fill VIN (17 alphanumeric chars)
-                if (!document.getElementById('fVin').value) {
-                    const vin = text.toUpperCase().match(/\b[A-HJ-NPR-Z0-9]{17}\b/);
-                    if (vin) { document.getElementById('fVin').value = vin[0]; filled++; }
-                }
-
-                // Try to fill make/model from common BIH doc labels
-                const makeMatch = text.match(/(?:MARKA|MAKE|D\.1)[:\s]+([A-Za-z]+)/i);
-                if (makeMatch && !document.getElementById('fMake').value) {
-                    document.getElementById('fMake').value = makeMatch[1].trim();
-                    filled++;
-                }
-
-                // Try year
-                const yearMatch = text.match(/(?:GODINA|YEAR|B)[:\s]*(\d{4})/i);
-                if (yearMatch && !document.getElementById('fYear').value) {
-                    const yr = parseInt(yearMatch[1]);
-                    if (yr > 1970 && yr <= new Date().getFullYear()) {
-                        document.getElementById('fYear').value = yr;
-                        filled++;
-                    }
-                }
-
-                if (filled > 0) {
-                    toast(`Popunjeno ${filled} polje(a) iz dokumenta!`, 'success');
-                } else {
-                    toast('Dokument pročitan, ali format nije prepoznat. Provjerite ručno.', 'info');
-                }
-            } catch (err) {
-                console.error('Reg OCR error:', err);
                 toast('OCR greška: ' + err.message, 'error');
             } finally {
                 zone.innerHTML = originalContent;
