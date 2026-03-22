@@ -1178,6 +1178,61 @@
             flex-shrink: 0;
         }
 
+        .vehicle-tile-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+            padding: 4px 0;
+        }
+        .vehicle-tile {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: border-color .2s, transform .15s;
+            display: flex;
+            flex-direction: column;
+        }
+        .vehicle-tile:hover { border-color: var(--primary); transform: translateY(-2px); }
+        .vehicle-tile-img {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: var(--bg3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text3);
+            font-size: 2rem;
+            overflow: hidden;
+        }
+        .vehicle-tile-img img { width: 100%; height: 100%; object-fit: cover; }
+        .vehicle-tile-plate {
+            font-weight: 700;
+            font-size: .95rem;
+            padding: 8px 10px 2px;
+            color: var(--text1);
+        }
+        .vehicle-tile-info {
+            font-size: .78rem;
+            color: var(--text3);
+            padding: 0 10px 2px;
+        }
+        .vehicle-tile-owner {
+            font-size: .78rem;
+            color: var(--text2);
+            padding: 0 10px 6px;
+        }
+        .vehicle-tile-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px 8px;
+            border-top: 1px solid var(--border);
+            margin-top: auto;
+        }
+        .view-toggle { display: flex; gap: 4px; }
+
         .vci-info {
             display: flex;
             flex-direction: column;
@@ -1656,14 +1711,47 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
             if (viewId) return renderVehicleProfile(viewId);
             const vehicles = getVehicles();
             const pg = document.getElementById('page-vehicles');
-            pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-car"></i>Vozila</h2><div><button class="btn btn-secondary" onclick="loadFromFirebase().then(()=>{renderVehicles();toast('Osvježeno!','success')})"><i class="fas fa-sync"></i>Osvježi</button> <button class="btn btn-primary" onclick="openVehicleModal()"><i class="fas fa-plus"></i>Novo Vozilo</button></div></div>
+            const vv = localStorage.getItem('vehicleView') || 'list';
+            pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-car"></i>Vozila</h2><div style="display:flex;gap:6px;align-items:center">
+<div class="view-toggle"><button id="btnViewList" class="btn btn-sm ${vv==='list'?'btn-primary':'btn-secondary'}" onclick="setVehicleView('list')" title="Lista"><i class="fas fa-list"></i></button><button id="btnViewTile" class="btn btn-sm ${vv==='tile'?'btn-primary':'btn-secondary'}" onclick="setVehicleView('tile')" title="Pločice"><i class="fas fa-th"></i></button></div>
+<button class="btn btn-primary" onclick="openVehicleModal()"><i class="fas fa-plus"></i>Novo Vozilo</button></div></div>
 <div class="search-box"><input class="search-input" id="vSearch" placeholder="Pretraži po tablici, broju registracije ili imenu..." oninput="filterVehicles()"><select class="search-input" style="flex:0 0 180px" id="vSort" onchange="filterVehicles()"><option value="recent">Najnovije</option><option value="name">Po Imenu</option><option value="plate">Po Tablici</option></select></div>
 <div id="vehiclesList">${renderVehicleTable(vehicles)}</div>`;
         }
 
+        function setVehicleView(v) {
+            localStorage.setItem('vehicleView', v);
+            document.getElementById('btnViewList').className = 'btn btn-sm ' + (v==='list'?'btn-primary':'btn-secondary');
+            document.getElementById('btnViewTile').className = 'btn btn-sm ' + (v==='tile'?'btn-primary':'btn-secondary');
+            filterVehicles();
+        }
+
         function renderVehicleTable(vehicles) {
             if (!vehicles.length) return '<div class="empty-state"><i class="fas fa-car"></i><p>Nema vozila u bazi. Kliknite "Novo Vozilo" da dodate.</p></div>';
-            // Card layout for mobile, table for desktop
+            const vv = localStorage.getItem('vehicleView') || 'list';
+
+            if (vv === 'tile') {
+                const tiles = vehicles.map(v => {
+                    const rc = (v.repairs || []).length;
+                    const thumb = v.images && v.images.length ? v.images[0] : null;
+                    return `<div class="vehicle-tile" onclick="navigate('vehicles','${v.id}')">
+                        <div class="vehicle-tile-img">${thumb ? `<img src="${thumb}">` : `<i class="fas fa-car"></i>`}</div>
+                        <div class="vehicle-tile-plate">${v.plate}</div>
+                        <div class="vehicle-tile-info">${v.make} ${v.model} ${v.year || ''}</div>
+                        <div class="vehicle-tile-owner"><i class="fas fa-user" style="font-size:.7rem"></i> ${v.owner}</div>
+                        <div class="vehicle-tile-footer">
+                            <span class="badge badge-blue">${rc} usluga</span>
+                            <div onclick="event.stopPropagation()" style="display:flex;gap:4px">
+                                <button class="btn btn-sm btn-secondary" onclick="openVehicleModal('${v.id}')"><i class="fas fa-edit"></i></button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteVehicle('${v.id}')"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+                return `<div class="vehicle-tile-grid">${tiles}</div>`;
+            }
+
+            // List view (original)
             const cards = vehicles.map(v => {
                 const rc = (v.repairs || []).length;
                 const tot = (v.repairs || []).reduce((s, r) => s + Number(r.charged || 0), 0);
@@ -1687,7 +1775,6 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
                     </div>
                 </div>`;
             }).join('');
-            // Table for desktop
             const table = `<div class="table-wrap desktop-only"><table><thead><tr><th>Slika</th><th>Tablica</th><th>Vlasnik</th><th>Vozilo</th><th>VIN</th><th>Reg.</th><th>Usluge</th><th>Iznos</th><th>Akcije</th></tr></thead><tbody>${vehicles.map(v => {
                 const rc = (v.repairs || []).length;
                 const tot = (v.repairs || []).reduce((s, r) => s + Number(r.charged || 0), 0);
@@ -1718,7 +1805,7 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
 <div class="ocr-zone" onclick="document.getElementById('ocrInput').click()"><i class="fas fa-camera"></i><p style="color:var(--text3);font-size:.82rem">Foto tablice ili saobraćajne dozvole — automatski popunjava polja</p><input type="file" id="ocrInput" accept="image/*" style="display:none" onchange="handleOCR(this)"></div>
 <div class="form-row"><div class="form-group"><label>Registarska Tablica *</label><input id="fPlate" value="${v ? v.plate : ''}" placeholder="npr. A12-B-345"></div><div class="form-group"><label>Broj Šasije (VIN)</label><input id="fVin" value="${v ? v.vin || '' : ''}" placeholder="17 karaktera"></div></div>
 <div class="form-row"><div class="form-group"><label>Vlasnik *</label><input id="fOwner" value="${v ? v.owner : ''}" placeholder="Ime i prezime"></div><div class="form-group"><label>Broj Registracije</label><input id="fReg" value="${v ? v.regNumber || '' : ''}" placeholder="Saobraćajna dozvola"></div></div>
-<div class="form-row"><div class="form-group"><label>Telefon</label><input id="fPhone" value="${v ? v.phone || '' : ''}" placeholder="06x xxx xxx"></div><div class="form-group"><label>Email</label><input id="fEmail" value="${v ? v.email || '' : ''}" placeholder="email@primjer.com"></div></div>
+<div class="form-row"><div class="form-group"><label>Telefon</label><input id="fPhone" value="${v ? v.phone || '' : ''}" placeholder="06x xxx xxx"></div></div>
 <div class="form-row"><div class="form-group"><label>Marka *</label><input id="fMake" value="${v ? v.make : ''}" placeholder="npr. Volkswagen"></div><div class="form-group"><label>Model *</label><input id="fModel" value="${v ? v.model : ''}" placeholder="npr. Golf 7"></div></div>
 <div class="form-row"><div class="form-group"><label>Godina</label><input type="number" id="fYear" value="${v ? v.year || '' : ''}" placeholder="2020"></div><div class="form-group"><label>Kilometraža</label><input type="number" id="fKm" value="${v ? v.km || '' : ''}" placeholder="150000"></div></div>
 <div class="form-group"><label>Slike Vozila</label><input type="file" id="fImages" accept="image/*" multiple onchange="handleVehicleImages(this)"><div class="img-gallery" id="fImgPreview">${window._vehicleImages.map((img, i) => '<div class="img-gallery-item"><img src="' + img + '"><button class="img-remove" onclick="removePreviewImg(' + i + ')"><i class="fas fa-times"></i></button></div>').join('')}</div></div>
@@ -1741,7 +1828,6 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
                         regNumber: document.getElementById('fReg').value.trim(),
                         vin: document.getElementById('fVin').value.trim(),
                         phone: document.getElementById('fPhone').value.trim(),
-                        email: document.getElementById('fEmail').value.trim(),
                         year: document.getElementById('fYear').value,
                         km: document.getElementById('fKm').value,
                         notes: document.getElementById('fNotes').value,
@@ -1751,7 +1837,6 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
                         regNumber: document.getElementById('fReg').value.trim(),
                         vin: document.getElementById('fVin').value.trim(),
                         phone: document.getElementById('fPhone').value.trim(),
-                        email: document.getElementById('fEmail').value.trim(),
                         year: document.getElementById('fYear').value,
                         km: document.getElementById('fKm').value,
                         notes: document.getElementById('fNotes').value,
@@ -2086,7 +2171,7 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
             const pg = document.getElementById('page-vehicles');
             const vImages = (v.images || []);
             pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-arrow-left" style="cursor:pointer" onclick="renderVehicles()"></i> Profil Vozila</h2><div class="profile-actions"><button class="btn btn-secondary" onclick="openVehicleModal('${v.id}')"><i class="fas fa-edit"></i>Uredi</button><button class="btn btn-primary" onclick="openRepairModal('${v.id}')"><i class="fas fa-plus"></i>Nova Popravka</button><button class="btn btn-secondary" onclick="openReminderModalForVehicle('${v.id}','${v.plate}')"><i class="fas fa-bell"></i></button><button class="btn btn-danger" onclick="deleteVehicle('${v.id}')"><i class="fas fa-trash"></i></button></div></div>
-<div class="vehicle-profile-header"><div class="vehicle-plate"><div class="vehicle-plate-bih">BIH</div><div class="vehicle-plate-text">${v.plate}</div></div><div><h3>${v.owner}</h3><p style="color:var(--text3)">${v.make} ${v.model} ${v.year || ''} ${v.km ? '• ' + Number(v.km).toLocaleString() + ' km' : ''}</p><p style="color:var(--text3);font-size:.8rem">${v.phone || ''} ${v.email ? '• ' + v.email : ''}</p></div></div>
+<div class="vehicle-profile-header"><div class="vehicle-plate"><div class="vehicle-plate-bih">BIH</div><div class="vehicle-plate-text">${v.plate}</div></div><div><h3>${v.owner}</h3><p style="color:var(--text3)">${v.make} ${v.model} ${v.year || ''} ${v.km ? '• ' + Number(v.km).toLocaleString() + ' km' : ''}</p><p style="color:var(--text3);font-size:.8rem">${v.phone || ''}</p></div></div>
 <div class="vehicle-info-grid">
 <div class="vehicle-info-item"><label>Broj Šasije (VIN)</label><span>${v.vin || '-'}</span></div>
 <div class="vehicle-info-item"><label>Br. Registracije</label><span>${v.regNumber || '-'}</span></div>
@@ -2167,6 +2252,16 @@ ${repairs.length ? `
 <div class="form-group"><label>Naplaćeno za rad (KM)</label><input type="number" id="rLaborCost" value="${laborCost}" step="0.01" oninput="calcRepairProfit()"></div>
 <div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:14px" id="rProfitSummary"></div>
 <div class="form-group"><label>Ukupno naplaćeno klijentu (KM) *</label><input type="number" id="rCharged" value="${r ? r.charged || 0 : 0}" step="0.01" oninput="calcRepairProfit()"></div>
+<div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+  <button type="button" class="btn btn-secondary" style="width:100%" onclick="generateMotorexOrder('${v.make}','${v.model}','${v.vin||''}','${v.year||''}')"><i class="fas fa-truck"></i> Naruči dijelove u Motorexu</button>
+  <div id="motorexOrderBox" style="display:none;margin-top:10px">
+    <textarea id="motorexOrderText" readonly style="width:100%;min-height:90px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text1);font-size:.9rem;resize:vertical"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button type="button" class="btn btn-primary" style="flex:1" onclick="copyMotorexOrder()"><i class="fas fa-copy"></i> Kopiraj</button>
+      <button type="button" class="btn btn-secondary" style="flex:1;background:#7360f2;border-color:#7360f2;color:#fff" onclick="sendMotorexViber()"><i class="fas fa-paper-plane"></i> Viber</button>
+    </div>
+  </div>
+</div>
 `, () => {
                 const date = document.getElementById('rDate').value;
                 const desc = document.getElementById('rDesc').value.trim();
@@ -2239,6 +2334,46 @@ ${repairs.length ? `
 
         function deleteRepair(vId, rId) { if (!confirm('Obrisati ovu popravku?')) return; const v = getVehicles(); const vi = v.findIndex(x => x.id === vId); v[vi].repairs = v[vi].repairs.filter(r => r.id !== rId); saveVehicles(v); toast('Popravka obrisana!'); renderVehicleProfile(vId); }
 
+        function generateMotorexOrder(make, model, vin, year) {
+            const parts = (document.getElementById('rParts')?.value || '').trim();
+            const box = document.getElementById('motorexOrderBox');
+            const txt = document.getElementById('motorexOrderText');
+            if (!box || !txt) return;
+            const partsLine = parts ? parts : '(unesite dijelove u polje "Korišteni Dijelovi")';
+            txt.value = `${make} ${model}\nVIN: ${vin || 'N/A'}\nGodina: ${year || 'N/A'}\n\nDijelovi:\n${partsLine}`;
+            box.style.display = 'block';
+            txt.focus();
+        }
+
+        function copyMotorexOrder() {
+            const txt = document.getElementById('motorexOrderText');
+            if (!txt) return;
+            navigator.clipboard.writeText(txt.value).then(() => toast('Kopirano!', 'success'));
+        }
+
+        function sendMotorexViber() {
+            const txt = document.getElementById('motorexOrderText');
+            if (!txt) return;
+            const phone = localStorage.getItem('motorexViberPhone') || '';
+            if (!phone) { toast('Unesite Viber broj dobavljača u Postavkama!', 'warning'); return; }
+            const msg = encodeURIComponent(txt.value);
+            window.open(`viber://chat?number=${phone}&text=${msg}`, '_blank');
+        }
+
+        function saveMotorexPhone() {
+            const val = (document.getElementById('motorexPhoneInput')?.value || '').replace(/\s+/g, '');
+            if (!val) { toast('Unesite broj!', 'error'); return; }
+            localStorage.setItem('motorexViberPhone', val);
+            toast('Broj sačuvan!', 'success');
+        }
+
+        function saveReminderTemplate() {
+            const val = document.getElementById('reminderTplInput')?.value || '';
+            if (!val.trim()) { toast('Predložak ne može biti prazan!', 'error'); return; }
+            localStorage.setItem('reminderMsgTemplate', val);
+            toast('Predložak sačuvan!', 'success');
+        }
+
         // ===== FINANCES =====
         // Helper: compute profit fields from a repair (handles old and new data format)
         function repairProfit(r) {
@@ -2276,9 +2411,15 @@ ${repairs.length ? `
 
             pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-chart-line"></i>Finansije</h2><button class="btn btn-primary" onclick="openExpenseModal()"><i class="fas fa-plus"></i>Novi Trošak</button></div>
 <div class="stat-cards">
-<div class="stat-card"><div class="stat-label">Ukupni Profit</div><div class="stat-value" style="color:#34d399">${fmt(totalPartsProfit + totalLaborProfit)}</div><div class="stat-sub">Dijelovi + Rad</div></div>
-<div class="stat-card"><div class="stat-label">Profit od Dijelova</div><div class="stat-value" style="color:#f59e0b">${fmt(totalPartsProfit)}</div><div class="stat-sub">Rabat na nabavku</div></div>
-<div class="stat-card"><div class="stat-label">Profit od Rada</div><div class="stat-value" style="color:#60a5fa">${fmt(totalLaborProfit)}</div><div class="stat-sub">Radni sati</div></div>
+<div class="stat-card">
+  <div class="stat-label">Ukupni Profit</div>
+  <div class="stat-value" style="color:#34d399">${fmt(totalPartsProfit + totalLaborProfit)}</div>
+  <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.75rem;color:#94a3b8">
+    <span>Dijelovi: <span style="color:#f59e0b">${fmt(totalPartsProfit)}</span></span>
+    <span>Rad: <span style="color:#60a5fa">${fmt(totalLaborProfit)}</span></span>
+  </div>
+</div>
+<div class="stat-card"><div class="stat-label">Troškovi Radionice</div><div class="stat-value" style="color:#f87171">${fmt(totalExpenses)}</div><div class="stat-sub">Operativni troškovi</div></div>
 <div class="stat-card"><div class="stat-label">Neto Profit</div><div class="stat-value" style="color:${netProfit >= 0 ? '#34d399' : '#f87171'}">${fmt(netProfit)}</div><div class="stat-sub">Nakon troškova radionice</div></div>
 </div>
 <div class="dash-grid">
@@ -2387,7 +2528,15 @@ ${vehicleRows.map(({v, vCharged, vParts, vLabor, vProfit, count}) => `
 <div class="card"><div class="card-title"><i class="fas fa-clock"></i>Aktivni Podsjetnici (${active.length})</div>
 ${active.length ? active.map(r => {
                 const d = new Date(r.dueDate), now = new Date(), diff = Math.ceil((d - now) / (1000 * 60 * 60 * 24)); const cls = diff < 0 ? 'urgent' : diff < 7 ? 'soon' : '';
-                return `<div class="reminder-item ${cls}"><div class="ri-info"><div class="ri-title">${r.title}</div><div class="ri-sub">${r.vehiclePlate ? '<i class="fas fa-car"></i> ' + r.vehiclePlate : '<i class="fas fa-store"></i> Opće'} ${r.description ? ' — ' + r.description : ''}</div></div><div class="ri-date">${diff < 0 ? '<span style="color:var(--red)">Isteklo ' + Math.abs(diff) + ' dana</span>' : diff === 0 ? '<span style="color:var(--yellow)">Danas!</span>' : 'Za ' + diff + ' dana'}<br>${fmtDate(r.dueDate)}</div><div style="display:flex;gap:6px"><button class="btn btn-sm btn-success" onclick="completeReminder('${r.id}')" title="Završi"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-danger" onclick="deleteReminder('${r.id}')" title="Obriši"><i class="fas fa-trash"></i></button></div></div>`
+                const v = vehicles.find(x => x.plate === r.vehiclePlate);
+                const hasPhone = v && v.phone;
+                const contactBtns = hasPhone ? `
+                  <div style="display:flex;gap:4px">
+                    <button class="btn btn-sm btn-secondary" title="Pozovi" onclick="sendReminderContact('call','${r.id}')"><i class="fas fa-phone"></i></button>
+                    <button class="btn btn-sm btn-secondary" title="SMS" onclick="sendReminderContact('sms','${r.id}')"><i class="fas fa-sms"></i></button>
+                    <button class="btn btn-sm btn-secondary" style="background:#7360f2;border-color:#7360f2;color:#fff" title="Viber" onclick="sendReminderContact('viber','${r.id}')"><i class="fas fa-paper-plane"></i></button>
+                  </div>` : '';
+                return `<div class="reminder-item ${cls}"><div class="ri-info"><div class="ri-title">${r.title}</div><div class="ri-sub">${r.vehiclePlate ? '<i class="fas fa-car"></i> ' + r.vehiclePlate : '<i class="fas fa-store"></i> Opće'} ${r.description ? ' — ' + r.description : ''}</div></div><div class="ri-date">${diff < 0 ? '<span style="color:var(--red)">Isteklo ' + Math.abs(diff) + ' dana</span>' : diff === 0 ? '<span style="color:var(--yellow)">Danas!</span>' : 'Za ' + diff + ' dana'}<br>${fmtDate(r.dueDate)}</div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">${contactBtns}<div style="display:flex;gap:6px"><button class="btn btn-sm btn-success" onclick="completeReminder('${r.id}')" title="Završi"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-danger" onclick="deleteReminder('${r.id}')" title="Obriši"><i class="fas fa-trash"></i></button></div></div></div>`
             }).join('') : '<div class="empty-state"><i class="fas fa-bell-slash"></i><p>Nema aktivnih podsjetnika</p></div>'}
 </div>
 <div class="card"><div class="card-title"><i class="fas fa-lightbulb"></i>Preporučeni Servisi</div><p style="font-size:.82rem;color:var(--text3);margin-bottom:14px">Kliknite na preporuku da kreirate podsjetnik</p>
@@ -2411,6 +2560,22 @@ ${completed.length ? `<div class="card"><div class="card-title"><i class="fas fa
 
         function completeReminder(id) { const rem = getReminders(); const r = rem.find(x => x.id === id); if (r) r.completed = true; saveReminders(rem); toast('Podsjetnik završen!'); setTimeout(() => renderRemindersPage(), 50); }
         function deleteReminder(id) { const rem = getReminders().filter(r => r.id !== id); saveReminders(rem); toast('Podsjetnik obrisan!'); setTimeout(() => renderRemindersPage(), 50); }
+
+        function sendReminderContact(type, remId) {
+            const rem = getReminders().find(r => r.id === remId);
+            if (!rem) return;
+            const vehicles = getVehicles();
+            const v = vehicles.find(x => x.plate === rem.vehiclePlate);
+            if (!v || !v.phone) { toast('Vozilo nema uneseni broj telefona!', 'warning'); return; }
+            const phone = v.phone.replace(/\s+/g, '');
+            if (type === 'call') { window.open(`tel:${phone}`, '_self'); return; }
+            const defaultTpl = `Poštovani, Vaše vozilo {vozilo} bi danas trebalo imati {naslov}. Ukoliko se želite naručiti molimo Vas da nas kontaktirate. Pozdrav`;
+            const tpl = localStorage.getItem('reminderMsgTemplate') || defaultTpl;
+            const vehicleLabel = `${v.make || ''} ${v.model || ''}`.trim() || rem.vehiclePlate;
+            const msg = tpl.replace('{vozilo}', vehicleLabel).replace('{naslov}', rem.title);
+            if (type === 'sms') { window.open(`sms:${phone}?body=${encodeURIComponent(msg)}`, '_self'); }
+            else if (type === 'viber') { window.open(`viber://chat?number=${phone}&text=${encodeURIComponent(msg)}`, '_blank'); }
+        }
 
         // ===== WORKERS =====
         function renderWorkers() {
@@ -2474,7 +2639,20 @@ ${workers.map(w => {
 <div style="display:flex;gap:10px;flex-wrap:wrap">
 <button class="btn btn-secondary" onclick="printReport('monthly')"><i class="fas fa-file-alt"></i>Mjesečni Izvještaj</button>
 <button class="btn btn-secondary" onclick="printReport('yearly')"><i class="fas fa-file-alt"></i>Godišnji Izvještaj</button>
-</div></div>`;
+</div></div>
+
+<div class="card"><div class="card-title"><i class="fas fa-truck"></i>Motorex Dobavljač</div>
+<p style="font-size:.85rem;color:var(--text2);margin-bottom:14px">Viber broj dobavljača koji se koristi za narudžbu dijelova.</p>
+<div class="form-row" style="align-items:flex-end">
+  <div class="form-group" style="margin-bottom:0"><label>Viber broj (npr. 38761123456)</label><input id="motorexPhoneInput" type="tel" placeholder="38761123456" value="${localStorage.getItem('motorexViberPhone') || ''}"></div>
+  <button class="btn btn-primary" style="white-space:nowrap" onclick="saveMotorexPhone()"><i class="fas fa-save"></i> Sačuvaj</button>
+</div></div>
+
+<div class="card"><div class="card-title"><i class="fas fa-comment-sms"></i>Predložak Poruke za Podsjetnike</div>
+<p style="font-size:.85rem;color:var(--text2);margin-bottom:6px">Koristite <code style="background:var(--bg3);padding:1px 5px;border-radius:4px">{vozilo}</code> za naziv vozila i <code style="background:var(--bg3);padding:1px 5px;border-radius:4px">{naslov}</code> za naslov podsjetnika.</p>
+<div class="form-group"><textarea id="reminderTplInput" style="min-height:90px">${localStorage.getItem('reminderMsgTemplate') || 'Poštovani, Vaše vozilo {vozilo} bi danas trebalo imati {naslov}. Ukoliko se želite naručiti molimo Vas da nas kontaktirate. Pozdrav'}</textarea></div>
+<button class="btn btn-primary" onclick="saveReminderTemplate()"><i class="fas fa-save"></i> Sačuvaj Predložak</button>
+</div>`;
         }
 
 
