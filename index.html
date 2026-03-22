@@ -1728,92 +1728,91 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
         }
 
         // Parse BIH saobraćajna dozvola
-        // Handles OCR noise: labels and values may be on same line or next line,
-        // parentheses may be missing or garbled by OCR.
+        // OCR.space returns the whole doc as a mostly-concatenated string.
+        // Strategy: find each field code, grab the token(s) that follow it.
         function parseRegistrationDoc(text) {
             const result = {};
 
-            // Split into lines, trim each, drop empty
-            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+            // Normalize: collapse whitespace runs but keep single spaces
+            const t = text.replace(/\r/g, ' ').replace(/\n/g, ' ').replace(/\s{2,}/g, ' ');
+            console.log('OCR normalized:', t);
 
-            // Log lines for debugging
-            console.log('OCR lines:', lines);
-
-            // Find value associated with a label pattern.
-            // Checks: same line after label, or next non-empty line.
-            function findValue(labelPattern) {
-                for (let i = 0; i < lines.length; i++) {
-                    const m = lines[i].match(labelPattern);
-                    if (m) {
-                        // Value on same line after the label
-                        const rest = lines[i].replace(labelPattern, '').trim();
-                        if (rest.length > 0) return rest;
-                        // Value on next line
-                        if (i + 1 < lines.length) return lines[i + 1].trim();
-                    }
-                }
-                return null;
+            // Extract the first match of a regex from string s, or null
+            function pick(str, re) {
+                const m = str.match(re);
+                return m ? (m[1] || m[0]).trim() : null;
             }
 
-            // (A) Plate — label variants: "(A)", "A)", "(A) REGISTARSKA..."
-            // Value is the plate itself, e.g. "M03-E-189"
-            const plateLine = findValue(/^\(?A\)?[\s\)]*(?:REGISTAR[^\n]*)?$/i);
-            if (plateLine) {
-                result.plate = extractPlateFromText(plateLine);
-            }
-            // Fallback: first plate-pattern found anywhere in text
-            if (!result.plate) result.plate = extractPlateFromText(lines.join(' '));
-
-            // (C.1.1) Surname — label: "(C.1.1)", "C.1.1)", "C11"
-            const surname = findValue(/\(?C\.?1\.?1\)?/i);
-            if (surname) result.surname = surname.replace(/[^A-ZČĆŽŠĐa-zčćžšđ\s\-]/g, '').trim();
-
-            // (C.1.2) Name
-            const name = findValue(/\(?C\.?1\.?2\)?/i);
-            if (name) result.name = name.replace(/[^A-ZČĆŽŠĐa-zčćžšđ\s\-]/g, '').trim();
-
-            // (D.1) Make — label: "(D.1)", "D.1)", "D1"
-            const make = findValue(/\(?D\.?1\)?/i);
-            if (make) result.make = make.replace(/[^A-Za-z\s\-]/g, '').trim();
-
-            // (D.3) Model
-            const model = findValue(/\(?D\.?3\)?/i);
-            if (model) result.model = model.trim();
-
-            // (E) VIN — label: "(E)", "E)"
-            const vinRaw = findValue(/^\(?E\)?$/i);
-            if (vinRaw) {
-                const vin = vinRaw.match(/[A-HJ-NPR-Z0-9]{17}/i);
-                if (vin) result.vin = vin[0].toUpperCase();
-            }
-            // Fallback: scan all lines for 17-char VIN sequence
-            if (!result.vin) {
-                for (const line of lines) {
-                    const vin = line.match(/[A-HJ-NPR-Z0-9]{17}/i);
-                    if (vin) { result.vin = vin[0].toUpperCase(); break; }
-                }
+            // Get the text between two patterns (exclusive)
+            function between(startRe, endRe) {
+                const s = t.search(startRe);
+                if (s === -1) return null;
+                const after = t.slice(s).replace(startRe, '').trim();
+                const e = after.search(endRe);
+                return (e === -1 ? after : after.slice(0, e)).trim();
             }
 
-            // (8) Year of manufacture — label: "(8)", "8)"
-            const yearRaw = findValue(/^\(?8\)?$/i);
-            if (yearRaw) {
-                const yr = yearRaw.match(/(19|20)\d{2}/);
-                if (yr) result.year = yr[0];
+            // ── (A) Plate ──────────────────────────────────────────────
+            // Raw: "(A)REGISTARSKA OZNAKA/...MUS-E-189(©)"
+            // Plate sits between end of the long label and the next "(" marker
+            const plateChunk = between(/\(A\)[^(]{5,}?(?=\s[A-Z]\d{2})/, /\s*\(/);
+            if (plateChunk) result.plate = extractPlateFromText(plateChunk);
+            // Fallback: scan whole text
+            if (!result.plate) result.plate = extractPlateFromText(t);
+
+            // ── (C.1.1) Surname, (C.1.2) Name ─────────────────────────
+            // Raw: "...(C.1(C.1.1)(C 1.2)(C,1.3)(18(CA)KESTENHAIRUDIN..."
+            // Values appear as ALL-CAPS words after the label block ends at "(CA)"
+            // Grab the chunk between "(CA)" and "PODACI O REGISTRACI"
+            const personalChunk = between(/\(C[^)]*A\)/, /PODACI\s+O\s+REGISTRACI/i);
+            if (personalChunk) {
+                // Split on uppercase word boundaries — names are all caps
+                const words = personalChunk.match(/[A-ZČĆŽŠĐ]{2,}/g) || [];
+                // First word = surname, second = name (skip "VLASNIK","ZENICA" etc.)
+                const nameWords = words.filter(w => !['VLASNIK','ZENICA','KANAL','PODACI'].includes(w));
+                if (nameWords[0]) result.surname = nameWords[0];
+                if (nameWords[1]) result.name = nameWords[1];
             }
-            // Fallback: find a 4-digit year (1970–current) that appears after VIN on right side
+
+            // ── (D.1) Make ─────────────────────────────────────────────
+            // OCR often reads "D" as "0", so match (D.1) or (0.1)
+            // Raw: "(0.1) PEUGEOT"
+            const makeChunk = between(/\([D0O]\.?1\)/, /\([D0O]\.?2\)|\([D0O]\.?3\)/i);
+            if (makeChunk) result.make = makeChunk.replace(/[^A-Za-z\s\-]/g, '').trim();
+
+            // ── (D.3) Model ────────────────────────────────────────────
+            // Raw: "(0.3) 407"
+            const modelChunk = between(/\([D0O]\.?3\)/, /\(E\)|\([D0O]\.?[4-9]\)/i);
+            if (modelChunk) result.model = modelChunk.replace(/[^A-Za-z0-9\s\-]/g, '').trim();
+
+            // ── (E) VIN ────────────────────────────────────────────────
+            // 17 alphanumeric chars, no I/O/Q — scan whole text, most reliable
+            const vin = t.match(/\b([A-HJ-NPR-Z0-9]{17})\b/i);
+            if (vin) result.vin = vin[1].toUpperCase();
+
+            // ── (8) Year ───────────────────────────────────────────────
+            // Raw: "(8):2004" or "(8) 2004"
+            // Find (8) that is followed by a 4-digit year (not a date like 28.05.2024)
+            const yearMatch = t.match(/\(8\)\s*:?\s*((?:19|20)\d{2})\b/);
+            if (yearMatch) result.year = yearMatch[1];
+            // Fallback: last standalone 4-digit year in range
             if (!result.year) {
                 const now = new Date().getFullYear();
-                for (const line of lines) {
-                    const yr = line.match(/\b(19[7-9]\d|20[0-2]\d)\b/);
-                    if (yr && parseInt(yr[0]) <= now) { result.year = yr[0]; break; }
-                }
+                const allYears = [...t.matchAll(/\b(19[7-9]\d|20[0-2]\d)\b/g)]
+                    .map(m => m[1])
+                    .filter(y => parseInt(y) <= now && !t.includes('.' + y)); // exclude dates like 11.05.2015
+                if (allYears.length) result.year = allYears[allYears.length - 1];
             }
 
-            // (3) Reg number (MUP-issued, e.g. A58K383) — label: "(3)", "3)"
-            // This is under "PODACI O PRVOJ REGISTRACIJI" section, field (5) on the doc
-            // but OCR may label it (3) or (5)
-            const regRaw = findValue(/^\(?[35]\)?$/i);
-            if (regRaw) result.regNumber = regRaw.replace(/\s+/g, '').trim();
+            // ── (5) Reg number ─────────────────────────────────────────
+            // Raw: "A58K383" — appears near end under "PODACI O PRVOJ REGISTRACIJI"
+            // Field (5) on the doc, but OCR may label it differently
+            // Most reliable: find alphanumeric token 5-8 chars after "ZENICA" in that section
+            const prvRegChunk = between(/PODACI\s+O\s+PRVOJ\s+REGISTRACI/i, /\([D0O6]\)/i);
+            if (prvRegChunk) {
+                const regNum = prvRegChunk.match(/\b([A-Z]\d{2,3}[A-Z]\d{3}|[A-Z]{1,3}\d{4,7})\b/i);
+                if (regNum) result.regNumber = regNum[1].toUpperCase();
+            }
 
             return result;
         }
