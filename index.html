@@ -9,10 +9,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
-        rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -1047,105 +1048,92 @@
         </div>
     </div>
     <script>
-        // Auto-refresh when tab becomes visible
-        const DB = { get(k) { try { return JSON.parse(localStorage.getItem('ta_' + k)) || null } catch (e) { return null } }, set(k, v) { localStorage.setItem('ta_' + k, JSON.stringify(v)) }, init() { if (!this.get('vehicles')) this.set('vehicles', []); if (!this.get('workers')) this.set('workers', [{ id: 'w1', name: 'Dragan', phone: '', spec: 'Mehanika', active: true }, { id: 'w2', name: 'Sadmir', phone: '', spec: 'Elektrika', active: true }]); if (!this.get('expenses')) this.set('expenses', []); if (!this.get('reminders')) this.set('reminders', []) } };
+        // ===== FIREBASE INIT =====
+        const firebaseConfig = {
+            apiKey: "AIzaSyD4purrEm5s48QwUaJK8tp2tnaB7mJodBE",
+            authDomain: "topauto-62aea.firebaseapp.com",
+            projectId: "topauto-62aea",
+            storageBucket: "topauto-62aea.firebasestorage.app",
+            messagingSenderId: "751076063610",
+            appId: "1:751076063610:web:ef4b1d29ab2185b944fec3"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const DOC = db.collection('topauto').doc('data');
+
+        // ===== DATA LAYER =====
+        // localStorage as fast local cache, Firestore as source of truth
+        const DB = {
+            get(k) { try { return JSON.parse(localStorage.getItem('ta_' + k)) || null } catch(e) { return null } },
+            set(k, v) { localStorage.setItem('ta_' + k, JSON.stringify(v)) },
+            init() {
+                if (!this.get('vehicles')) this.set('vehicles', []);
+                if (!this.get('workers')) this.set('workers', [
+                    { id: 'w1', name: 'Dragan', phone: '', spec: 'Mehanika', active: true },
+                    { id: 'w2', name: 'Sadmir', phone: '', spec: 'Elektrika', active: true }
+                ]);
+                if (!this.get('expenses')) this.set('expenses', []);
+                if (!this.get('reminders')) this.set('reminders', []);
+            }
+        };
+
         function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5) }
         function fmt(n) { return new Intl.NumberFormat('bs-BA', { style: 'currency', currency: 'BAM' }).format(n) }
         function fmtDate(d) { if (!d) return '-'; return new Date(d).toLocaleDateString('bs-BA') }
         function toast(msg, type = 'success') { const t = document.createElement('div'); t.className = 'toast toast-' + type; t.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : 'info-circle') + '"></i>' + msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3000) }
+
         function getVehicles() { return DB.get('vehicles') || [] }
-        function saveVehicles(v) { 
-            DB.set('vehicles', v); 
-            console.log('Saving vehicles with repairs:', v.map(vehicle => ({ plate: vehicle.plate, repairs: vehicle.repairs?.length || 0 })));
-            syncToGoogleSheets(); 
-        }
         function getWorkers() { return DB.get('workers') || [] }
-        function saveWorkers(w) { DB.set('workers', w); syncToGoogleSheets(); }
         function getExpenses() { return DB.get('expenses') || [] }
-        function saveExpenses(e) { DB.set('expenses', e); syncToGoogleSheets(); }
         function getReminders() { return DB.get('reminders') || [] }
-        function saveReminders(r) { DB.set('reminders', r); syncToGoogleSheets(); }
 
-        // ===== GOOGLE SHEETS CLOUD (AUTOMATED) =====
-        const GS_URL = 'https://script.google.com/macros/s/AKfycbxsQPxZQPcYepKJE3oUWEls-jFWHxuVvvBvkbVrrFIfs2hnMZUhYIWeFaoz7diPjLeI6g/exec';
+        function saveVehicles(v) { DB.set('vehicles', v); syncToFirebase(); }
+        function saveWorkers(w) { DB.set('workers', w); syncToFirebase(); }
+        function saveExpenses(e) { DB.set('expenses', e); syncToFirebase(); }
+        function saveReminders(r) { DB.set('reminders', r); syncToFirebase(); }
 
-        async function syncToGoogleSheets() {
-            const now = new Date().toISOString();
-            // Set local timestamp FIRST so cloud can't overwrite with older data
-            localStorage.setItem('ta_last_sync', now);
-
-            const fullData = {
-                vehicles: getVehicles(),
-                workers: getWorkers(),
-                expenses: getExpenses(),
-                reminders: getReminders(),
-                lastUpdate: now
-            };
-
-            try {
-                fetch(GS_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'sync', data: fullData })
-                });
-            } catch (e) {
-                console.error('Auto-sync error:', e);
-            }
+        // ===== FIREBASE SYNC =====
+        let syncTimer = null;
+        function syncToFirebase() {
+            // Debounce — wait 500ms after last change before writing
+            clearTimeout(syncTimer);
+            syncTimer = setTimeout(async () => {
+                try {
+                    await DOC.set({
+                        vehicles: getVehicles(),
+                        workers: getWorkers(),
+                        expenses: getExpenses(),
+                        reminders: getReminders(),
+                        lastUpdate: new Date().toISOString()
+                    });
+                } catch(e) {
+                    console.error('Firebase sync error:', e);
+                    toast('Greška pri sinkronizaciji!', 'error');
+                }
+            }, 500);
         }
 
-        async function loadFromGoogleSheets(isAuto = false) {
+        async function loadFromFirebase() {
             try {
-                const response = await fetch(GS_URL + '?action=get&t=' + Date.now());
-                const result = await response.json();
-
-                if (result.status === 'success' && result.data) {
-                    const localUpdate = localStorage.getItem('ta_last_sync');
-                    const serverData = result.data;
-                    const serverUpdate = serverData.lastUpdate;
-
-                    if (!localUpdate || (serverUpdate && new Date(serverUpdate) > new Date(localUpdate))) {
-                        importJSONData(serverData);
-                        localStorage.setItem('ta_last_sync', serverUpdate || new Date().toISOString());
-
-                        // Only show toast on manual refresh, not auto
-                        if (!isAuto) {
-                            toast('Podaci ažurirani', 'success');
-                            
-                            // Only refresh page view on manual refresh
-                            const activePage = document.querySelector('.page.active');
-                            if (activePage) {
-                                const pageId = activePage.id.replace('page-', '');
-                                if (pageId === 'vehicles') {
-                                    const urlParams = new URLSearchParams(window.location.hash.substring(1));
-                                    const viewId = urlParams.get('id');
-                                    renderVehicles(viewId);
-                                } else if (pageId === 'dashboard') {
-                                    renderDashboard();
-                                } else if (pageId === 'finances') {
-                                    renderFinances();
-                                } else if (pageId === 'reminders') {
-                                    renderRemindersPage();
-                                } else if (pageId === 'workers') {
-                                    renderWorkers();
-                                }
-                            }
-                        } else {
-                            console.log('Podaci sinkronizirani sa oblaka (pozadina)');
-                        }
-                    }
+                const snap = await DOC.get();
+                if (snap.exists) {
+                    const data = snap.data();
+                    if (data.vehicles) DB.set('vehicles', data.vehicles);
+                    if (data.workers) DB.set('workers', data.workers);
+                    if (data.expenses) DB.set('expenses', data.expenses);
+                    if (data.reminders) DB.set('reminders', data.reminders);
                 }
-            } catch (e) {
-                console.error('Cloud load error:', e);
+            } catch(e) {
+                console.error('Firebase load error:', e);
             }
         }
 
         function importJSONData(data) {
-            // Write directly to DB without triggering syncToGoogleSheets
             if (data.vehicles) DB.set('vehicles', data.vehicles);
             if (data.workers) DB.set('workers', data.workers);
             if (data.expenses) DB.set('expenses', data.expenses);
             if (data.reminders) DB.set('reminders', data.reminders);
+            syncToFirebase();
         }
 
         // ===== PROFORMA (PREDRAČUNI) =====
@@ -1309,18 +1297,6 @@
             toast('Predračun uspješno kreiran!', 'success');
         }
 
-        // Auto-refresh when tab becomes visible
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                loadFromGoogleSheets(true);
-            }
-        });
-
-        // Periodic sync check every 10 seconds
-        setInterval(() => {
-            loadFromGoogleSheets(true);
-        }, 10000);
-
         // ===== NAVIGATION =====
         const pages = ['dashboard', 'vehicles', 'finances', 'proforma', 'reminders', 'workers', 'settings'];
         const pageIcons = ['fa-gauge-high', 'fa-car', 'fa-chart-line', 'fa-file-invoice', 'fa-bell', 'fa-users', 'fa-gear'];
@@ -1403,7 +1379,7 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
             if (viewId) return renderVehicleProfile(viewId);
             const vehicles = getVehicles();
             const pg = document.getElementById('page-vehicles');
-            pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-car"></i>Vozila</h2><div><button class="btn btn-secondary" onclick="loadFromGoogleSheets(false); toast('Osvježavanje...', 'info')"><i class="fas fa-sync"></i>Osvježi</button> <button class="btn btn-primary" onclick="openVehicleModal()"><i class="fas fa-plus"></i>Novo Vozilo</button></div></div>
+            pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-car"></i>Vozila</h2><div><button class="btn btn-secondary" onclick="loadFromFirebase().then(()=>{renderVehicles();toast('Osvježeno!','success')})"><i class="fas fa-sync"></i>Osvježi</button> <button class="btn btn-primary" onclick="openVehicleModal()"><i class="fas fa-plus"></i>Novo Vozilo</button></div></div>
 <div class="search-box"><input class="search-input" id="vSearch" placeholder="Pretraži po tablici, broju registracije ili imenu..." oninput="filterVehicles()"><select class="search-input" style="flex:0 0 180px" id="vSort" onchange="filterVehicles()"><option value="recent">Najnovije</option><option value="name">Po Imenu</option><option value="plate">Po Tablici</option></select></div>
 <div id="vehiclesList">${renderVehicleTable(vehicles)}</div>`;
         }
@@ -1982,18 +1958,18 @@ ${workers.map(w => {
             else if (today.length) setTimeout(() => toast(`🔔 Imate ${today.length} podsjetnika za danas!`, 'info'), 1000);
         }
 
-        // WordPress / Browser Init
-        document.addEventListener('DOMContentLoaded', function () {
+        // ===== BOOT =====
+        document.addEventListener('DOMContentLoaded', async function () {
             try {
                 document.getElementById('topauto-app-wrapper').style.display = 'block';
-                const loader = document.getElementById('topauto-loader');
-                if (loader) loader.style.display = 'none';
+                document.getElementById('topauto-loader').style.display = 'block';
                 DB.init();
+                await loadFromFirebase();
+                document.getElementById('topauto-loader').style.display = 'none';
                 renderSidebar();
                 initPages();
                 navigate('dashboard');
                 startReminderCheck();
-                setTimeout(() => loadFromGoogleSheets(true), 800);
             } catch (e) {
                 console.error("Top Auto Error:", e);
                 document.getElementById('topauto-app-wrapper').innerHTML = `<div style="color:red;padding:20px;background:#1a1a1a;border-radius:8px">Greška: ${e.message}</div>`;
