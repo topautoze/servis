@@ -1702,7 +1702,7 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
         // Podržava: tablice (foto tablice) i saobraćajne dozvole (foto dokumenta)
 
         function getOCRKey() {
-            return localStorage.getItem('ocr_ocrspace_key') || '';
+            return 'K87003778288957';
         }
 
         // Normalize raw plate text to BIH format where possible (e.g. A12B345 → A12-B-345)
@@ -2231,14 +2231,7 @@ ${workers.map(w => {
 <div class="vehicle-info-item"><label>Troškovi</label><span>${getExpenses().length}</span></div>
 <div class="vehicle-info-item"><label>Podsjetnici</label><span>${getReminders().length}</span></div>
 </div></div>
-<div class="card"><div class="card-title"><i class="fas fa-camera"></i>OCR Konfiguracija</div>
-<p style="font-size:.85rem;color:var(--text2);margin-bottom:16px">OCR.space — besplatno prepoznavanje teksta, bez kreditne kartice. Radi za tablice i saobraćajne dozvole.</p>
-<div id="ocrKeyFields"></div>
-<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
-<button class="btn btn-primary" onclick="saveOCRSettings()"><i class="fas fa-save"></i>Sačuvaj</button>
-<button class="btn btn-secondary" onclick="testOCR()"><i class="fas fa-vial"></i>Test (foto tablice)</button>
-</div>
-</div>
+
 <div class="card"><div class="card-title"><i class="fas fa-print"></i>Ispis Izvještaja</div>
 <div style="display:flex;gap:10px;flex-wrap:wrap">
 <button class="btn btn-secondary" onclick="printReport('monthly')"><i class="fas fa-file-alt"></i>Mjesečni Izvještaj</button>
@@ -2246,32 +2239,7 @@ ${workers.map(w => {
 </div></div>`;
         }
 
-        // ===== OCR SETTINGS UI =====
-        function updateOCRProviderUI() {
-            const key = getOCRKey();
-            const fields = document.getElementById('ocrKeyFields');
-            if (fields) fields.innerHTML = `<div class="form-group"><label>OCR.space API ključ</label><input type="password" id="ocrKey1" placeholder="helloworld (demo) ili vaš ključ..." value="${key}"><p style="font-size:.75rem;color:var(--text3);margin-top:4px">Besplatna registracija (bez kartice): <a href="https://ocr.space/ocrapi/freekey" target="_blank" style="color:var(--accent2)">ocr.space/ocrapi/freekey</a></p></div>`;
-        }
 
-        function saveOCRSettings() {
-            const key = document.getElementById('ocrKey1')?.value?.trim() || '';
-            localStorage.setItem('ocr_ocrspace_key', key);
-            toast('OCR postavke sačuvane!', 'success');
-        }
-
-        function testOCR() {
-            const input = document.createElement('input');
-            input.type = 'file'; input.accept = 'image/*';
-            input.onchange = (e) => handleOCR(e.target);
-            input.click();
-        }
-
-        // Populate OCR settings when settings page loads
-        const _origRenderSettings = renderSettings;
-        renderSettings = function() {
-            _origRenderSettings();
-            setTimeout(() => updateOCRProviderUI(), 0);
-        };
 
         function exportData() {
             try {
