@@ -1590,7 +1590,7 @@
         function renderDashboard() {
             const vehicles = getVehicles(), workers = getWorkers();
             let totalRepairs = 0, totalEarned = 0, totalSpentParts = 0, activeRepairs = 0;
-            vehicles.forEach(v => (v.repairs || []).forEach(r => { totalRepairs++; totalEarned += Number(r.charged || 0); totalSpentParts += Number(r.partsCost || 0); if (r.status === 'active') activeRepairs++; }));
+            vehicles.forEach(v => (v.repairs || []).forEach(r => { totalRepairs++; totalEarned += repairProfit(r).totalProfit; totalSpentParts += repairProfit(r).partsCost; if (r.status === 'active') activeRepairs++; }));
             const expenses = getExpenses();
             const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
             const netProfit = totalEarned - totalSpentParts - totalExpenses;
@@ -2078,8 +2078,11 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
             const vehicles = getVehicles(); const v = vehicles.find(x => x.id === id);
             if (!v) { renderVehicles(); return }
             const repairs = (v.repairs || []).sort((a, b) => new Date(b.date) - new Date(a.date));
-            const totalCharged = repairs.reduce((s, r) => s + Number(r.charged || 0), 0);
-            const totalParts = repairs.reduce((s, r) => s + Number(r.partsCost || 0), 0);
+            const totalCharged    = repairs.reduce((s, r) => s + repairProfit(r).charged, 0);
+            const totalParts      = repairs.reduce((s, r) => s + repairProfit(r).partsCost, 0);
+            const totalPartsProfit= repairs.reduce((s, r) => s + repairProfit(r).partsProfit, 0);
+            const totalLabor      = repairs.reduce((s, r) => s + repairProfit(r).laborCost, 0);
+            const totalVProfit    = totalPartsProfit + totalLabor;
             const pg = document.getElementById('page-vehicles');
             const vImages = (v.images || []);
             pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-arrow-left" style="cursor:pointer" onclick="renderVehicles()"></i> Profil Vozila</h2><div class="profile-actions"><button class="btn btn-secondary" onclick="openVehicleModal('${v.id}')"><i class="fas fa-edit"></i>Uredi</button><button class="btn btn-primary" onclick="openRepairModal('${v.id}')"><i class="fas fa-plus"></i>Nova Popravka</button><button class="btn btn-secondary" onclick="openReminderModalForVehicle('${v.id}','${v.plate}')"><i class="fas fa-bell"></i></button><button class="btn btn-danger" onclick="deleteVehicle('${v.id}')"><i class="fas fa-trash"></i></button></div></div>
@@ -2089,8 +2092,9 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
 <div class="vehicle-info-item"><label>Br. Registracije</label><span>${v.regNumber || '-'}</span></div>
 <div class="vehicle-info-item"><label>Ukupno Popravki</label><span>${repairs.length}</span></div>
 <div class="vehicle-info-item"><label>Ukupno Naplaćeno</label><span>${fmt(totalCharged)}</span></div>
-<div class="vehicle-info-item"><label>Troškovi Dijelova</label><span>${fmt(totalParts)}</span></div>
-<div class="vehicle-info-item"><label>Profit od Vozila</label><span>${fmt(totalCharged - totalParts)}</span></div>
+<div class="vehicle-info-item"><label>Profit Dijelovi</label><span style="color:var(--yellow)">${fmt(totalPartsProfit)}</span></div>
+<div class="vehicle-info-item"><label>Profit Rad</label><span style="color:var(--accent2)">${fmt(totalLabor)}</span></div>
+<div class="vehicle-info-item"><label>Ukupni Profit</label><span style="color:var(--green)">${fmt(totalVProfit)}</span></div>
 <div class="vehicle-info-item"><label>Napomene</label><span>${v.notes || '-'}</span></div>
 </div>
 ${vImages.length ? `<div class="card"><div class="card-title"><i class="fas fa-images"></i>Slike Vozila (${vImages.length})</div><div class="img-gallery">${vImages.map(img => '<div class="img-gallery-item" onclick="showLightbox(this.querySelector(\'img\').src)"><img src="' + img + '"></div>').join('')}</div></div>` : ''}
@@ -2133,52 +2137,172 @@ ${repairs.length ? `
             const r = repairId ? (v.repairs || []).find(x => x.id === repairId) : null;
             const workers = getWorkers().filter(w => w.active);
             const commonRepairs = ['Zamjena ulja i filtera', 'Zamjena kočnica', 'Zamjena remena', 'Servis klime', 'Zamjena akumulatora', 'Zamjena svjećica', 'Dijagnostika', 'Geometrija trapa', 'Zamjena amortizera', 'Zamjena kvačila', 'Popravka auspuha', 'Zamjena guma', 'Balansiranje', 'Zamjena diskova', 'Veliki servis'];
+
+            // Backwards compat: old records only have partsCost (what customer paid for parts)
+            // New records have: partsCharged (customer pays), partsCost (your actual cost after rabat)
+            const partsCharged = r ? (r.partsCharged ?? r.partsCost ?? 0) : 0;
+            const partsCost    = r ? (r.partsCost ?? 0) : 0;
+            const hasRabat     = r ? !!r.rabat : true; // default on for new repairs
+            const laborCost    = r ? (r.laborCost ?? Math.max(0, (r.charged||0) - (r.partsCharged ?? r.partsCost ?? 0))) : 0;
+
             showModal(`${r ? 'Uredi' : 'Nova'} Popravka - ${v.plate}`, `
 <div class="form-group"><label>Datum *</label><input type="date" id="rDate" value="${r ? r.date : new Date().toISOString().split('T')[0]}"></div>
 <div class="form-group"><label>Opis Popravke *</label><textarea id="rDesc" placeholder="Opišite popravku...">${r ? r.description || '' : ''}</textarea><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${commonRepairs.map(c => `<span class="badge badge-blue" style="cursor:pointer" onclick="document.getElementById('rDesc').value+=this.textContent+'; '">${c}</span>`).join('')}</div></div>
 <div class="form-row"><div class="form-group"><label>Radnik</label><select id="rWorker"><option value="">-- Izaberi --</option>${workers.map(w => `<option value="${w.name}"${r && r.worker === w.name ? ' selected' : ''}>${w.name}</option>`).join('')}</select></div><div class="form-group"><label>Status</label><select id="rStatus"><option value="active"${r && r.status === 'active' ? ' selected' : ''}>U toku</option><option value="done"${r && r.status === 'done' ? ' selected' : ''}>Završeno</option><option value="waiting"${r && r.status === 'waiting' ? ' selected' : ''}>Čeka</option></select></div></div>
 <div class="form-group"><label>Korišteni Dijelovi</label><textarea id="rParts" placeholder="Npr: filter ulja, kočione plocice...">${r ? r.partsUsed || '' : ''}</textarea></div>
-<div class="form-group"><label>Cijena Materijala (KM)</label><input type="number" id="rPartsCost" value="${r ? r.partsCost || 0 : 0}" step="0.01"></div>
-<div class="form-group"><label>Naplaćeno Klijentu (KM) *</label><input type="number" id="rCharged" value="${r ? r.charged || 0 : 0}" step="0.01"></div>
+<div style="background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <span style="font-size:.85rem;font-weight:600">Dijelovi</span>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.82rem;color:var(--text2)">
+      <input type="checkbox" id="rRabat" ${hasRabat ? 'checked' : ''} onchange="calcRepairProfit()">
+      Rabat 30% (vi plaćate 70%)
+    </label>
+  </div>
+  <div class="form-row">
+    <div class="form-group" style="margin-bottom:0"><label>Naplaćeno klijentu za dijelove (KM)</label><input type="number" id="rPartsCharged" value="${partsCharged}" step="0.01" oninput="calcRepairProfit()"></div>
+    <div class="form-group" style="margin-bottom:0"><label>Vaš stvarni trošak dijelova (KM)</label><input type="number" id="rPartsCost" value="${partsCost}" step="0.01" oninput="calcRepairProfit()" style="background:var(--bg4)"></div>
+  </div>
+  <div id="rPartsProfit" style="margin-top:8px;font-size:.8rem;color:var(--green)"></div>
+</div>
+<div class="form-group"><label>Naplaćeno za rad (KM)</label><input type="number" id="rLaborCost" value="${laborCost}" step="0.01" oninput="calcRepairProfit()"></div>
+<div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:14px" id="rProfitSummary"></div>
+<div class="form-group"><label>Ukupno naplaćeno klijentu (KM) *</label><input type="number" id="rCharged" value="${r ? r.charged || 0 : 0}" step="0.01" oninput="calcRepairProfit()"></div>
 `, () => {
-                const date = document.getElementById('rDate').value; const desc = document.getElementById('rDesc').value.trim(); const charged = document.getElementById('rCharged').value;
-                if (!date || !desc) { toast('Popunite datum i opis!', 'error'); return false }
-                const repair = { id: r ? r.id : uid(), date, description: desc, worker: document.getElementById('rWorker').value, status: document.getElementById('rStatus').value, partsUsed: document.getElementById('rParts').value, partsCost: Number(document.getElementById('rPartsCost').value) || 0, charged: Number(charged) || 0 };
+                const date = document.getElementById('rDate').value;
+                const desc = document.getElementById('rDesc').value.trim();
+                if (!date || !desc) { toast('Popunite datum i opis!', 'error'); return false; }
+                const partsCharged = Number(document.getElementById('rPartsCharged').value) || 0;
+                const partsCost    = Number(document.getElementById('rPartsCost').value) || 0;
+                const laborCost    = Number(document.getElementById('rLaborCost').value) || 0;
+                const charged      = Number(document.getElementById('rCharged').value) || 0;
+                const rabat        = document.getElementById('rRabat').checked;
+                const repair = {
+                    id: r ? r.id : uid(), date, description: desc,
+                    worker: document.getElementById('rWorker').value,
+                    status: document.getElementById('rStatus').value,
+                    partsUsed: document.getElementById('rParts').value,
+                    partsCharged, partsCost, laborCost, rabat, charged
+                };
                 const vehicles2 = getVehicles(); const vi = vehicles2.findIndex(x => x.id === vehicleId);
                 if (!vehicles2[vi].repairs) vehicles2[vi].repairs = [];
                 if (r) { const ri = vehicles2[vi].repairs.findIndex(x => x.id === r.id); vehicles2[vi].repairs[ri] = repair; }
                 else { vehicles2[vi].repairs.push(repair); }
                 saveVehicles(vehicles2); toast(r ? 'Popravka ažurirana!' : 'Popravka dodana!'); renderVehicleProfile(vehicleId); return true;
             });
+            // Init profit display after modal renders
+            setTimeout(calcRepairProfit, 50);
+        }
+
+        function calcRepairProfit() {
+            const partsCharged = Number(document.getElementById('rPartsCharged')?.value) || 0;
+            const laborCost    = Number(document.getElementById('rLaborCost')?.value) || 0;
+            const rabat        = document.getElementById('rRabat')?.checked;
+            const costEl       = document.getElementById('rPartsCost');
+            const profitEl     = document.getElementById('rPartsProfit');
+            const summaryEl    = document.getElementById('rProfitSummary');
+            const chargedEl    = document.getElementById('rCharged');
+
+            // Auto-calculate actual parts cost with rabat
+            if (rabat && costEl) {
+                const actualCost = partsCharged * 0.70;
+                costEl.value = actualCost.toFixed(2);
+                costEl.style.background = 'var(--bg4)';
+                costEl.readOnly = true;
+            } else if (costEl) {
+                costEl.readOnly = false;
+                costEl.style.background = '';
+            }
+
+            const partsCost  = Number(costEl?.value) || 0;
+            const partsProfit = partsCharged - partsCost;
+
+            if (profitEl) {
+                profitEl.innerHTML = partsCharged > 0
+                    ? `Profit od dijelova: <strong>${fmt(partsProfit)}</strong> (platili ste ${fmt(partsCost)}, naplatili ${fmt(partsCharged)})`
+                    : '';
+            }
+
+            // Auto-fill total charged = parts + labor
+            const total = partsCharged + laborCost;
+            if (chargedEl && total > 0) chargedEl.value = total.toFixed(2);
+
+            const totalProfit = partsProfit + laborCost;
+            if (summaryEl) {
+                summaryEl.innerHTML = `
+                    <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:.82rem">
+                        <span>Profit od dijelova: <strong style="color:var(--green)">${fmt(partsProfit)}</strong></span>
+                        <span>Profit od rada: <strong style="color:var(--accent2)">${fmt(laborCost)}</strong></span>
+                        <span style="font-size:.9rem">Ukupni profit: <strong style="color:var(--yellow)">${fmt(totalProfit)}</strong></span>
+                    </div>`;
+            }
         }
 
         function deleteRepair(vId, rId) { if (!confirm('Obrisati ovu popravku?')) return; const v = getVehicles(); const vi = v.findIndex(x => x.id === vId); v[vi].repairs = v[vi].repairs.filter(r => r.id !== rId); saveVehicles(v); toast('Popravka obrisana!'); renderVehicleProfile(vId); }
 
         // ===== FINANCES =====
+        // Helper: compute profit fields from a repair (handles old and new data format)
+        function repairProfit(r) {
+            const charged      = Number(r.charged || 0);
+            const partsCharged = Number(r.partsCharged ?? r.partsCost ?? 0);
+            const partsCost    = Number(r.partsCost ?? 0);
+            const laborCost    = Number(r.laborCost ?? Math.max(0, charged - partsCharged));
+            const partsProfit  = partsCharged - partsCost;
+            const totalProfit  = partsProfit + laborCost;
+            return { charged, partsCharged, partsCost, laborCost, partsProfit, totalProfit };
+        }
+
         function renderFinances() {
             const pg = document.getElementById('page-finances');
             const vehicles = getVehicles(); const expenses = getExpenses();
-            const allRepairs = []; vehicles.forEach(v => (v.repairs || []).forEach(r => allRepairs.push({ ...r, plate: v.plate, owner: v.owner })));
-            const totalEarned = allRepairs.reduce((s, r) => s + Number(r.charged || 0), 0);
-            const totalPartsCost = allRepairs.reduce((s, r) => s + Number(r.partsCost || 0), 0);
-            const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-            const profit = totalEarned - totalPartsCost - totalExpenses;
+            const allRepairs = [];
+            vehicles.forEach(v => (v.repairs || []).forEach(r => allRepairs.push({ ...r, plate: v.plate, owner: v.owner, vid: v.id })));
+
+            const totalEarned     = allRepairs.reduce((s, r) => s + repairProfit(r).charged, 0);
+            const totalPartsCost  = allRepairs.reduce((s, r) => s + repairProfit(r).partsCost, 0);
+            const totalPartsProfit= allRepairs.reduce((s, r) => s + repairProfit(r).partsProfit, 0);
+            const totalLaborProfit= allRepairs.reduce((s, r) => s + repairProfit(r).laborCost, 0);
+            const totalExpenses   = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+            const netProfit       = totalPartsProfit + totalLaborProfit - totalExpenses;
+
+            // Per-vehicle profit summary
+            const vehicleRows = vehicles.map(v => {
+                const vRepairs = (v.repairs || []);
+                const vCharged = vRepairs.reduce((s, r) => s + repairProfit(r).charged, 0);
+                const vParts   = vRepairs.reduce((s, r) => s + repairProfit(r).partsProfit, 0);
+                const vLabor   = vRepairs.reduce((s, r) => s + repairProfit(r).laborCost, 0);
+                const vProfit  = vParts + vLabor;
+                return { v, vCharged, vParts, vLabor, vProfit, count: vRepairs.length };
+            }).filter(x => x.count > 0).sort((a, b) => b.vProfit - a.vProfit);
 
             pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-chart-line"></i>Finansije</h2><button class="btn btn-primary" onclick="openExpenseModal()"><i class="fas fa-plus"></i>Novi Trošak</button></div>
 <div class="stat-cards">
-<div class="stat-card"><div class="stat-label">Ukupna Zarada</div><div class="stat-value" style="color:#60a5fa">${fmt(totalEarned)}</div></div>
-<div class="stat-card"><div class="stat-label">Troškovi Materijala</div><div class="stat-value" style="color:#fbbf24">${fmt(totalPartsCost)}</div></div>
-<div class="stat-card"><div class="stat-label">Ostali Troškovi</div><div class="stat-value" style="color:#f87171">${fmt(totalExpenses)}</div></div>
-<div class="stat-card"><div class="stat-label">Neto Profit</div><div class="stat-value" style="color:${profit >= 0 ? '#34d399' : '#f87171'}">${fmt(profit)}</div></div>
+<div class="stat-card"><div class="stat-label">Ukupna Naplata</div><div class="stat-value" style="color:#60a5fa">${fmt(totalEarned)}</div><div class="stat-sub">Sve naplaćeno klijentima</div></div>
+<div class="stat-card"><div class="stat-label">Profit od Dijelova</div><div class="stat-value" style="color:#f59e0b">${fmt(totalPartsProfit)}</div><div class="stat-sub">Rabat na nabavku</div></div>
+<div class="stat-card"><div class="stat-label">Profit od Rada</div><div class="stat-value" style="color:#60a5fa">${fmt(totalLaborProfit)}</div><div class="stat-sub">Radni sati</div></div>
+<div class="stat-card"><div class="stat-label">Neto Profit</div><div class="stat-value" style="color:${netProfit >= 0 ? '#34d399' : '#f87171'}">${fmt(netProfit)}</div><div class="stat-sub">Nakon troškova radionice</div></div>
 </div>
-            <div class="dash-grid">
-                <div class="card"><div class="card-title"><i class="fas fa-chart-pie"></i>Raspodjela Prihoda</div><div class="chart-container"><canvas id="finPieChart"></canvas></div></div>
-                <div class="card"><div class="card-title"><i class="fas fa-chart-area"></i>Mjesečni Trend</div><div class="chart-container"><canvas id="finLineChart"></canvas></div></div>
-            </div>
-            <div class="dash-grid">
-                <div class="card"><div class="card-title"><i class="fas fa-wrench"></i>Zarada po Tipu Popravke</div><div class="chart-container"><canvas id="finRepairChart"></canvas></div></div>
-                <div class="card"><div class="card-title"><i class="fas fa-users"></i>Zarada po Radniku</div><div class="chart-container"><canvas id="finWorkerChart"></canvas></div></div>
-            </div>
+<div class="dash-grid">
+    <div class="card"><div class="card-title"><i class="fas fa-chart-pie"></i>Raspodjela Profita</div><div class="chart-container"><canvas id="finPieChart"></canvas></div></div>
+    <div class="card"><div class="card-title"><i class="fas fa-chart-area"></i>Mjesečni Trend</div><div class="chart-container"><canvas id="finLineChart"></canvas></div></div>
+</div>
+<div class="dash-grid">
+    <div class="card"><div class="card-title"><i class="fas fa-wrench"></i>Zarada po Tipu Popravke</div><div class="chart-container"><canvas id="finRepairChart"></canvas></div></div>
+    <div class="card"><div class="card-title"><i class="fas fa-users"></i>Zarada po Radniku</div><div class="chart-container"><canvas id="finWorkerChart"></canvas></div></div>
+</div>
+<div class="card"><div class="card-title"><i class="fas fa-car"></i>Profit po Vozilu</div>
+<div class="table-wrap"><table><thead><tr><th>Vozilo</th><th>Vlasnik</th><th>Pop.</th><th>Naplata</th><th>Profit Dijelovi</th><th>Profit Rad</th><th>Ukupni Profit</th></tr></thead><tbody>
+${vehicleRows.map(({v, vCharged, vParts, vLabor, vProfit, count}) => `
+<tr style="cursor:pointer" onclick="navigate('vehicles','${v.id}')">
+  <td><strong>${v.plate}</strong><br><small style="color:var(--text3)">${v.make} ${v.model}</small></td>
+  <td>${v.owner}</td>
+  <td><span class="badge badge-blue">${count}</span></td>
+  <td>${fmt(vCharged)}</td>
+  <td style="color:var(--yellow)">${fmt(vParts)}</td>
+  <td style="color:var(--accent2)">${fmt(vLabor)}</td>
+  <td><strong style="color:var(--green)">${fmt(vProfit)}</strong></td>
+</tr>`).join('')}
+</tbody><tfoot><tr style="background:var(--bg3)"><td colspan="3"><strong>UKUPNO</strong></td><td><strong>${fmt(totalEarned)}</strong></td><td style="color:var(--yellow)"><strong>${fmt(totalPartsProfit)}</strong></td><td style="color:var(--accent2)"><strong>${fmt(totalLaborProfit)}</strong></td><td><strong style="color:var(--green)">${fmt(netProfit + totalExpenses)}</strong></td></tr></tfoot>
+</table></div></div>
 <div class="card"><div class="card-title"><i class="fas fa-receipt"></i>Troškovi Radionice</div>
 <div class="search-box"><input class="search-input" id="expSearch" placeholder="Pretraži troškove..." oninput="filterExpenses()"><select class="search-input" style="flex:0 0 160px" id="expCat" onchange="filterExpenses()"><option value="">Sve Kategorije</option><option value="Najam">Najam</option><option value="Struja">Struja</option><option value="Alat">Alat</option><option value="Materijal">Materijal</option><option value="Plata">Plata</option><option value="Ostalo">Ostalo</option></select></div>
 <div id="expensesList">${renderExpenseTable(expenses)}</div></div>`;
@@ -2211,34 +2335,30 @@ ${repairs.length ? `
         function deleteExpense(id) { if (!confirm('Obrisati ovaj trošak?')) return; saveExpenses(getExpenses().filter(e => e.id !== id)); toast('Trošak obrisan!'); renderFinances(); }
 
         function renderFinanceCharts(repairs, expenses) {
-            // Pie chart
             const pieCanvas = document.getElementById('finPieChart');
             if (pieCanvas) {
-                const partsCost = repairs.reduce((s, r) => s + Number(r.partsCost || 0), 0);
+                const totalPartsProfit = repairs.reduce((s, r) => s + repairProfit(r).partsProfit, 0);
+                const totalLaborProfit = repairs.reduce((s, r) => s + repairProfit(r).laborCost, 0);
                 const totalExp = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-                const profit = repairs.reduce((s, r) => s + Number(r.charged || 0), 0) - partsCost - totalExp;
-                new Chart(pieCanvas, { type: 'doughnut', data: { labels: ['Profit', 'Troškovi Materijala', 'Troškovi Radionice'], datasets: [{ data: [Math.max(0, profit), partsCost, totalExp], backgroundColor: ['rgba(16,185,129,.8)', 'rgba(245,158,11,.8)', 'rgba(239,68,68,.8)'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } } } } });
+                new Chart(pieCanvas, { type: 'doughnut', data: { labels: ['Profit od Rada', 'Profit od Dijelova', 'Troškovi Radionice'], datasets: [{ data: [Math.max(0, totalLaborProfit), Math.max(0, totalPartsProfit), totalExp], backgroundColor: ['rgba(59,130,246,.8)', 'rgba(245,158,11,.8)', 'rgba(239,68,68,.8)'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } } } } });
             }
-            // Line chart
             const lineCanvas = document.getElementById('finLineChart');
             if (lineCanvas) {
                 const months = []; const now = new Date();
                 for (let i = 5; i >= 0; i--) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); months.push({ label: d.toLocaleDateString('bs-BA', { month: 'short', year: '2-digit' }), m: d.getMonth(), y: d.getFullYear() }); }
-                const earnedData = months.map(m => repairs.filter(r => { const d = new Date(r.date); return d.getMonth() === m.m && d.getFullYear() === m.y }).reduce((s, r) => s + Number(r.charged || 0), 0));
-                const expData = months.map(m => expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === m.m && d.getFullYear() === m.y }).reduce((s, e) => s + Number(e.amount || 0), 0));
-                new Chart(lineCanvas, { type: 'line', data: { labels: months.map(m => m.label), datasets: [{ label: 'Zarada', data: earnedData, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.1)', fill: true, tension: .4 }, { label: 'Troškovi', data: expData, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.1)', fill: true, tension: .4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,.08)' } }, y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,.08)' } } } } });
+                const profitData = months.map(m => repairs.filter(r => { const d = new Date(r.date); return d.getMonth() === m.m && d.getFullYear() === m.y }).reduce((s, r) => s + repairProfit(r).totalProfit, 0));
+                const expData    = months.map(m => expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === m.m && d.getFullYear() === m.y }).reduce((s, e) => s + Number(e.amount || 0), 0));
+                new Chart(lineCanvas, { type: 'line', data: { labels: months.map(m => m.label), datasets: [{ label: 'Profit', data: profitData, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.1)', fill: true, tension: .4 }, { label: 'Troškovi', data: expData, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.1)', fill: true, tension: .4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,.08)' } }, y: { ticks: { color: '#64748b', callback: v => fmt(v) }, grid: { color: 'rgba(148,163,184,.08)' } } } } });
             }
-            // Repair type chart
             const repairCanvas = document.getElementById('finRepairChart');
             if (repairCanvas) {
-                const types = {}; repairs.forEach(r => { const t = (r.description || 'Ostalo').split(';')[0].trim(); types[t] = (types[t] || 0) + Number(r.charged || 0) });
+                const types = {}; repairs.forEach(r => { const t = (r.description || 'Ostalo').split(';')[0].trim().substring(0, 20); types[t] = (types[t] || 0) + repairProfit(r).totalProfit; });
                 const sorted = Object.entries(types).sort((a, b) => b[1] - a[1]).slice(0, 8);
-                new Chart(repairCanvas, { type: 'bar', data: { labels: sorted.map(s => s[0].substring(0, 20)), datasets: [{ data: sorted.map(s => s[1]), backgroundColor: 'rgba(139,92,246,.7)', borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', callback: v => fmt(v) }, grid: { color: 'rgba(148,163,184,.08)' } }, y: { ticks: { color: '#94a3b8' }, grid: { display: false } } } } });
+                new Chart(repairCanvas, { type: 'bar', data: { labels: sorted.map(s => s[0]), datasets: [{ data: sorted.map(s => s[1]), backgroundColor: 'rgba(139,92,246,.7)', borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', callback: v => fmt(v) }, grid: { color: 'rgba(148,163,184,.08)' } }, y: { ticks: { color: '#94a3b8' }, grid: { display: false } } } } });
             }
-            // Worker chart
             const workerCanvas = document.getElementById('finWorkerChart');
             if (workerCanvas) {
-                const wEarnings = {}; repairs.forEach(r => { const w = r.worker || 'Nepoznat'; wEarnings[w] = (wEarnings[w] || 0) + Number(r.charged || 0) });
+                const wEarnings = {}; repairs.forEach(r => { const w = r.worker || 'Nepoznat'; wEarnings[w] = (wEarnings[w] || 0) + repairProfit(r).totalProfit; });
                 const entries = Object.entries(wEarnings);
                 new Chart(workerCanvas, { type: 'doughnut', data: { labels: entries.map(e => e[0]), datasets: [{ data: entries.map(e => e[1]), backgroundColor: ['rgba(59,130,246,.8)', 'rgba(139,92,246,.8)', 'rgba(16,185,129,.8)', 'rgba(245,158,11,.8)', 'rgba(236,72,153,.8)'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } } } } });
             }
