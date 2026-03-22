@@ -991,94 +991,9 @@
             box-shadow: 0 0 40px rgba(0, 0, 0, .5)
         }
 
-        /* Main App Wrapper (Hidden initially) */
+        /* Main App Wrapper */
         #topauto-app-wrapper {
-            display: none;
-        }
-
-        /* Login Screen Styles (Full Page) */
-        #login-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle at center, #2d3436 0%, #000000 100%);
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.5s ease;
-        }
-
-        #login-screen.hidden {
-            transform: translateY(-100%);
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .login-card {
-            background: rgba(17, 24, 39, 0.8);
-            backdrop-filter: blur(20px);
-            padding: 40px 30px;
-            border-radius: 28px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            text-align: center;
-            width: 90%;
-            max-width: 400px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-
-        .login-card i.logo-icon {
-            font-size: 3rem;
-            color: var(--accent);
-            margin-bottom: 20px;
             display: block;
-        }
-
-        .login-card h2 {
-            margin-bottom: 10px;
-            color: #fff;
-            font-size: 2rem;
-            font-weight: 700;
-        }
-
-        .login-input {
-            width: 100%;
-            padding: 15px;
-            background: rgba(0, 0, 0, 0.3);
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            color: #fff;
-            font-size: 1.5rem;
-            text-align: center;
-            letter-spacing: 8px;
-            margin-bottom: 25px;
-            transition: all 0.3s;
-        }
-
-        .login-input:focus {
-            border-color: var(--accent);
-            background: rgba(0, 0, 0, 0.5);
-            outline: none;
-            box-shadow: 0 0 15px rgba(231, 76, 60, 0.3);
-        }
-
-        .login-btn {
-            width: 100%;
-            padding: 15px;
-            border-radius: 12px;
-            font-weight: 600;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-
-        .login-logo {
-            width: 210px;
-            height: auto;
-            margin: 0 auto 20px;
-            display: block;
-            filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.4));
         }
 
         .sidebar-logo img {
@@ -1122,21 +1037,6 @@
 </head>
 
 <body>
-    <div id="login-screen">
-        <div class="login-card">
-            <img src="topautologo.png" alt="Top Auto" class="login-logo">
-            <p style="color:var(--text3); margin-bottom: 30px; font-size: 0.9rem;">Sistem za upravljanje radionicom</p>
-            <div class="form-group">
-                <input type="password" id="loginPass" class="login-input" maxlength="4" placeholder="••••"
-                    onkeyup="if(this.value.length==4) handleLogin()">
-            </div>
-            <button class="btn btn-primary login-btn" onclick="handleLogin()">Prijavi se</button>
-            <p id="loginError"
-                style="color:var(--red); font-size:0.9rem; margin-top:20px; display:none; font-weight: 500;">
-                <i class="fas fa-exclamation-circle"></i> Pogrešna šifra!
-            </p>
-        </div>
-    </div>
     <div id="topauto-app-wrapper">
         <div id="app">
             <nav id="sidebar"></nav>
@@ -1147,52 +1047,7 @@
         </div>
     </div>
     <script>
-        // WordPress / Browser Init
-        document.addEventListener('DOMContentLoaded', function () {
-            // Re-check session on load
-            if (sessionStorage.getItem('ta_auth') === 'true') {
-                showApp();
-            }
-        });
-
-        function handleLogin() {
-            const pass = document.getElementById('loginPass').value;
-            const error = document.getElementById('loginError');
-            if (pass === '8520') {
-                sessionStorage.setItem('ta_auth', 'true');
-                showApp();
-            } else {
-                error.style.display = 'block';
-                document.getElementById('loginPass').value = '';
-                setTimeout(() => error.style.display = 'none', 2000);
-            }
-        }
-
-        function showApp() {
-            document.getElementById('login-screen').classList.add('hidden');
-            const wrapper = document.getElementById('topauto-app-wrapper');
-            wrapper.style.display = 'block';
-
-            try {
-                const loader = document.getElementById('topauto-loader');
-                if (loader) loader.style.display = 'none';
-
-                if (typeof DB !== 'undefined') {
-                    DB.init();
-                    renderSidebar();
-                    initPages();
-                    navigate('dashboard');
-                    startReminderCheck();
-                    // Initial load from cloud
-                    setTimeout(() => loadFromGoogleSheets(true), 800);
-                }
-            } catch (e) {
-                console.error("Top Auto Error:", e);
-                const wrapper = document.getElementById('topauto-app-wrapper');
-                if (wrapper) wrapper.innerHTML = `<div style="color:red;padding:20px;background:#1a1a1a;border-radius:8px">Greška: ${e.message}</div>`;
-            }
-        }
-        // ===== DATA LAYER =====
+        // Auto-refresh when tab becomes visible
         const DB = { get(k) { try { return JSON.parse(localStorage.getItem('ta_' + k)) || null } catch (e) { return null } }, set(k, v) { localStorage.setItem('ta_' + k, JSON.stringify(v)) }, init() { if (!this.get('vehicles')) this.set('vehicles', []); if (!this.get('workers')) this.set('workers', [{ id: 'w1', name: 'Dragan', phone: '', spec: 'Mehanika', active: true }, { id: 'w2', name: 'Sadmir', phone: '', spec: 'Elektrika', active: true }]); if (!this.get('expenses')) this.set('expenses', []); if (!this.get('reminders')) this.set('reminders', []) } };
         function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5) }
         function fmt(n) { return new Intl.NumberFormat('bs-BA', { style: 'currency', currency: 'BAM' }).format(n) }
@@ -1215,34 +1070,25 @@
         const GS_URL = 'https://script.google.com/macros/s/AKfycbxsQPxZQPcYepKJE3oUWEls-jFWHxuVvvBvkbVrrFIfs2hnMZUhYIWeFaoz7diPjLeI6g/exec';
 
         async function syncToGoogleSheets() {
-            // Instant background sync
+            const now = new Date().toISOString();
+            // Set local timestamp FIRST so cloud can't overwrite with older data
+            localStorage.setItem('ta_last_sync', now);
+
             const fullData = {
                 vehicles: getVehicles(),
                 workers: getWorkers(),
                 expenses: getExpenses(),
                 reminders: getReminders(),
-                lastUpdate: new Date().toISOString()
+                lastUpdate: now
             };
 
-            console.log('Syncing to cloud:', {
-                vehiclesCount: fullData.vehicles.length,
-                totalRepairs: fullData.vehicles.reduce((sum, v) => sum + (v.repairs?.length || 0), 0),
-                workersCount: fullData.workers.length,
-                expensesCount: fullData.expenses.length,
-                remindersCount: fullData.reminders.length
-            });
-
             try {
-                // Use fetch without no-cors to ensure data is sent
                 fetch(GS_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'sync', data: fullData })
                 });
-                
-                console.log('Automatsko slanje završeno (pozadinsko)');
-                localStorage.setItem('ta_last_sync', fullData.lastUpdate);
             } catch (e) {
                 console.error('Auto-sync error:', e);
             }
@@ -1295,10 +1141,11 @@
         }
 
         function importJSONData(data) {
-            if (data.vehicles) saveVehicles(data.vehicles);
-            if (data.workers) saveWorkers(data.workers);
-            if (data.expenses) saveExpenses(data.expenses);
-            if (data.reminders) saveReminders(data.reminders);
+            // Write directly to DB without triggering syncToGoogleSheets
+            if (data.vehicles) DB.set('vehicles', data.vehicles);
+            if (data.workers) DB.set('workers', data.workers);
+            if (data.expenses) DB.set('expenses', data.expenses);
+            if (data.reminders) DB.set('reminders', data.reminders);
         }
 
         // ===== PROFORMA (PREDRAČUNI) =====
@@ -2138,22 +1985,18 @@ ${workers.map(w => {
         // WordPress / Browser Init
         document.addEventListener('DOMContentLoaded', function () {
             try {
+                document.getElementById('topauto-app-wrapper').style.display = 'block';
                 const loader = document.getElementById('topauto-loader');
                 if (loader) loader.style.display = 'none';
-
-                if (typeof DB !== 'undefined') {
-                    DB.init();
-                    renderSidebar();
-                    initPages();
-                    navigate('dashboard');
-                    startReminderCheck();
-                    // Initial load from cloud
-                    setTimeout(() => loadFromGoogleSheets(true), 1500);
-                }
+                DB.init();
+                renderSidebar();
+                initPages();
+                navigate('dashboard');
+                startReminderCheck();
+                setTimeout(() => loadFromGoogleSheets(true), 800);
             } catch (e) {
                 console.error("Top Auto Error:", e);
-                const wrapper = document.getElementById('topauto-app-wrapper');
-                if (wrapper) wrapper.innerHTML = `<div style="color:red;padding:20px;background:#1a1a1a;border-radius:8px">Greška: ${e.message}</div>`;
+                document.getElementById('topauto-app-wrapper').innerHTML = `<div style="color:red;padding:20px;background:#1a1a1a;border-radius:8px">Greška: ${e.message}</div>`;
             }
         });
     </script>
