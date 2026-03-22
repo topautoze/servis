@@ -1753,37 +1753,50 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
             }
 
             // ── (A) Plate ──────────────────────────────────────────────
-            // Raw: "(A)REGISTARSKA OZNAKA/...MUS-E-189(©)"
-            // Plate sits between end of the long label and the next "(" marker
-            const plateChunk = between(/\(A\)[^(]{5,}?(?=\s[A-Z]\d{2})/, /\s*\(/);
-            if (plateChunk) result.plate = extractPlateFromText(plateChunk);
+            // Raw: "(A) REGISTARSKA OZNAKA/... MUS-E-189 (©)..."
+            // Plate sits between the label text and the next "(" marker
+            const aChunk = between(/\(A\)/, /\(©\)|\([CB©]\)/i);
+            if (aChunk) result.plate = extractPlateFromText(aChunk);
             // Fallback: scan whole text
             if (!result.plate) result.plate = extractPlateFromText(t);
 
             // ── (C.1.1) Surname, (C.1.2) Name ─────────────────────────
-            // Raw: "...(C.1(C.1.1)(C 1.2)(C,1.3)(18(CA)KESTENHAIRUDIN..."
-            // Values appear as ALL-CAPS words after the label block ends at "(CA)"
-            // Grab the chunk between "(CA)" and "PODACI O REGISTRACI"
-            const personalChunk = between(/\(C[^)]*A\)/, /PODACI\s+O\s+REGISTRACI/i);
+            // Raw: "(CA) KESTEN HAIRUDIN ZENICA, ZENICA, KANAL 136 ... VLASNIK"
+            // First two all-caps words after (CA) are surname and name
+            const personalChunk = between(/\(CA?\)/, /PODACI\s+O\s+REGISTRACI/i);
             if (personalChunk) {
-                // Split on uppercase word boundaries — names are all caps
-                const words = personalChunk.match(/[A-ZČĆŽŠĐ]{2,}/g) || [];
-                // First word = surname, second = name (skip "VLASNIK","ZENICA" etc.)
-                const nameWords = words.filter(w => !['VLASNIK','ZENICA','KANAL','PODACI'].includes(w));
+                const words = personalChunk.match(/\b([A-ZČĆŽŠĐ]{2,})\b/g) || [];
+                const skip = new Set(['VLASNIK', 'ZENICA', 'KANAL', 'PODACI', 'SARAJEVO', 'MOSTAR', 'BANJA', 'LUKA', 'TUZLA', 'BIHAC', 'TRAVNIK']);
+                const nameWords = words.filter(w => !skip.has(w));
                 if (nameWords[0]) result.surname = nameWords[0];
                 if (nameWords[1]) result.name = nameWords[1];
             }
 
             // ── (D.1) Make ─────────────────────────────────────────────
-            // OCR often reads "D" as "0", so match (D.1) or (0.1)
-            // Raw: "(0.1) PEUGEOT"
-            const makeChunk = between(/\([D0O]\.?1\)/, /\([D0O]\.?2\)|\([D0O]\.?3\)/i);
+            // Raw: "(0.1) (D2) M1 - PUTNIČKI AUTOMOBIL PEUGEOT 6 (0.3)..."
+            // PEUGEOT comes after "M1 - PUTNIČKI AUTOMOBIL" block
+            const makeChunk = between(/M1\s*[-–]\s*PUTNI[CČ]KI\s+AUTOMOBIL/i, /\([D0O]\.?[23]\)|\(\d\)/i);
             if (makeChunk) result.make = makeChunk.replace(/[^A-Za-z\s\-]/g, '').trim();
+            // Fallback: word right after (0.1) or (D.1) skipping M1 block
+            if (!result.make) {
+                const m = t.match(/\([D0O]\.?1\)\s*(?:\(D2?\)\s*)?(?:M1[^P]+)?(PEUGEOT|VOLKSWAGEN|RENAULT|OPEL|BMW|MERCEDES|AUDI|TOYOTA|FORD|FIAT|SKODA|SEAT|HYUNDAI|KIA|HONDA|NISSAN|MAZDA|VOLVO|CITROEN|DACIA|SUZUKI|MITSUBISHI|SUBARU|JEEP|LAND\s*ROVER|ALFA\s*ROMEO|LANCIA|PORSCHE|FERRARI|LAMBORGHINI|MASERATI|JAGUAR|MINI|SMART|TESLA|ZASTAVA|YUGO|TAM|FAP)/i);
+                if (m) result.make = m[1];
+            }
 
             // ── (D.3) Model ────────────────────────────────────────────
-            // Raw: "(0.3) 407"
-            const modelChunk = between(/\([D0O]\.?3\)/, /\(E\)|\([D0O]\.?[4-9]\)/i);
-            if (modelChunk) result.model = modelChunk.replace(/[^A-Za-z0-9\s\-]/g, '').trim();
+            // Raw: "(0.3) (E) (7); (8): ... 407 VE36..."
+            // 407 appears right before the VIN
+            if (result.vin) {
+                // Grab the token(s) immediately before the VIN
+                const beforeVin = t.slice(0, t.indexOf(result.vin)).trim();
+                const modelMatch = beforeVin.match(/\b([A-Z0-9][A-Z0-9\s\-]{1,15})\s*$/i);
+                if (modelMatch) result.model = modelMatch[1].replace(/[^A-Za-z0-9\s\-]/g, '').trim();
+            }
+            // Fallback: token after (0.3) or (D.3) before next label
+            if (!result.model) {
+                const modelChunk = between(/\([D0O]\.?3\)/, /\(E\)|\([D0O]\.?[4-9]\)/i);
+                if (modelChunk) result.model = modelChunk.replace(/[^A-Za-z0-9\s\-]/g, '').trim();
+            }
 
             // ── (E) VIN ────────────────────────────────────────────────
             // 17 alphanumeric chars, no I/O/Q — scan whole text, most reliable
