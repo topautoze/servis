@@ -13,7 +13,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <link href="https://fonts.cdnfonts.com/css/fe-font" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -22,7 +23,8 @@
             box-sizing: border-box;
         }
 
-        html, body {
+        html,
+        body {
             overflow-x: hidden;
             max-width: 100%;
         }
@@ -773,7 +775,7 @@
             border: 3px solid #222;
             border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 4px 16px rgba(0,0,0,.4);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, .4);
             flex-shrink: 0;
             max-width: 100%;
         }
@@ -1122,12 +1124,22 @@
         }
 
         /* Vehicle card list (mobile) */
-        .mobile-only { display: none; }
-        .desktop-only { display: block; }
+        .mobile-only {
+            display: none;
+        }
+
+        .desktop-only {
+            display: block;
+        }
 
         @media(max-width: 768px) {
-            .mobile-only { display: block; }
-            .desktop-only { display: none; }
+            .mobile-only {
+                display: block;
+            }
+
+            .desktop-only {
+                display: none;
+            }
         }
 
         .vehicle-card-item {
@@ -1145,7 +1157,7 @@
         }
 
         .vehicle-card-item:hover {
-            border-color: rgba(59,130,246,.4);
+            border-color: rgba(59, 130, 246, .4);
         }
 
         .vci-left {
@@ -1184,6 +1196,7 @@
             gap: 12px;
             padding: 4px 0;
         }
+
         .vehicle-tile {
             background: var(--bg2);
             border: 1px solid var(--border);
@@ -1194,7 +1207,12 @@
             display: flex;
             flex-direction: column;
         }
-        .vehicle-tile:hover { border-color: var(--primary); transform: translateY(-2px); }
+
+        .vehicle-tile:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
         .vehicle-tile-img {
             width: 100%;
             aspect-ratio: 16/9;
@@ -1206,23 +1224,32 @@
             font-size: 2rem;
             overflow: hidden;
         }
-        .vehicle-tile-img img { width: 100%; height: 100%; object-fit: cover; }
+
+        .vehicle-tile-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
         .vehicle-tile-plate {
             font-weight: 700;
             font-size: .95rem;
             padding: 8px 10px 2px;
             color: var(--text1);
         }
+
         .vehicle-tile-info {
             font-size: .78rem;
             color: var(--text3);
             padding: 0 10px 2px;
         }
+
         .vehicle-tile-owner {
             font-size: .78rem;
             color: var(--text2);
             padding: 0 10px 6px;
         }
+
         .vehicle-tile-footer {
             display: flex;
             align-items: center;
@@ -1231,7 +1258,11 @@
             border-top: 1px solid var(--border);
             margin-top: auto;
         }
-        .view-toggle { display: flex; gap: 4px; }
+
+        .view-toggle {
+            display: flex;
+            gap: 4px;
+        }
 
         .vci-info {
             display: flex;
@@ -1315,7 +1346,7 @@
         // ===== DATA LAYER =====
         // localStorage as fast local cache, Firestore as source of truth
         const DB = {
-            get(k) { try { return JSON.parse(localStorage.getItem('ta_' + k)) || null } catch(e) { return null } },
+            get(k) { try { return JSON.parse(localStorage.getItem('ta_' + k)) || null } catch (e) { return null } },
             set(k, v) { localStorage.setItem('ta_' + k, JSON.stringify(v)) },
             init() {
                 if (!this.get('vehicles')) this.set('vehicles', []);
@@ -1388,7 +1419,7 @@
                     }
                     await batch.commit();
                     imageSyncQueue = {};
-                } catch(e) {
+                } catch (e) {
                     console.error('Firebase sync error:', e);
                     toast('Greška pri sinkronizaciji!', 'error');
                 }
@@ -1415,7 +1446,7 @@
                     if (data.expenses) DB.set('expenses', data.expenses);
                     if (data.reminders) DB.set('reminders', data.reminders);
                 }
-            } catch(e) {
+            } catch (e) {
                 console.error('Firebase load error:', e);
             }
         }
@@ -1643,20 +1674,43 @@
 
         // ===== DASHBOARD =====
         function renderDashboard() {
+            const period = getActivePeriod();
             const vehicles = getVehicles(), workers = getWorkers();
             let totalRepairs = 0, totalEarned = 0, totalSpentParts = 0, activeRepairs = 0;
-            vehicles.forEach(v => (v.repairs || []).forEach(r => { totalRepairs++; totalEarned += repairProfit(r).totalProfit; totalSpentParts += repairProfit(r).partsCost; if (r.status === 'active') activeRepairs++; }));
-            const expenses = getExpenses();
+            vehicles.forEach(v => (v.repairs || []).forEach(r => {
+                if (isDateInPeriod(r.date, period)) {
+                    totalRepairs++;
+                    totalEarned += repairProfit(r).totalProfit;
+                    totalSpentParts += repairProfit(r).partsCost;
+                    if (r.status === 'active') activeRepairs++;
+                }
+            }));
+            const expenses = getExpenses().filter(e => isDateInPeriod(e.date, period));
             const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
             const netProfit = totalEarned - totalSpentParts - totalExpenses;
             const pg = document.getElementById('page-dashboard');
             const recentRepairs = [];
-            vehicles.forEach(v => (v.repairs || []).forEach(r => recentRepairs.push({ ...r, plate: v.plate, owner: v.owner, images: v.images })));
+            vehicles.forEach(v => (v.repairs || []).forEach(r => {
+                if (isDateInPeriod(r.date, period)) {
+                    recentRepairs.push({ ...r, plate: v.plate, owner: v.owner, images: v.images });
+                }
+            }));
             recentRepairs.sort((a, b) => new Date(b.date) - new Date(a.date));
             const recent5 = recentRepairs.slice(0, 7);
+            const allRepairsHistory = [];
+            vehicles.forEach(v => (v.repairs || []).forEach(r => allRepairsHistory.push({ ...r, plate: v.plate, owner: v.owner, images: v.images })));
             const reminders = getReminders().filter(r => !r.completed).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate)).slice(0, 5);
 
+            const periodSelectorHtml = `
+<div class="tabs" style="margin-bottom: 24px;">
+    <div class="tab ${period === 'week' ? 'active' : ''}" onclick="changeFinancePeriod('week')">Ova sedmica</div>
+    <div class="tab ${period === 'month' ? 'active' : ''}" onclick="changeFinancePeriod('month')">Ovaj mjesec</div>
+    <div class="tab ${period === 'year' ? 'active' : ''}" onclick="changeFinancePeriod('year')">Ova godina</div>
+    <div class="tab ${period === 'all' ? 'active' : ''}" onclick="changeFinancePeriod('all')">Sve vrijeme</div>
+</div>`;
+
             pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-gauge-high"></i>Kontrolna Ploča</h2><div><span style="color:var(--text3);font-size:.82rem">${new Date().toLocaleDateString('hr-HR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span></div></div>
+${periodSelectorHtml}
 <div class="stat-cards">
 <div class="stat-card"><div class="stat-label">Ukupno Popravki</div><div class="stat-value">${totalRepairs}</div><div class="stat-sub">${activeRepairs} aktivnih</div></div>
 <div class="stat-card"><div class="stat-label">Ukupna Zarada</div><div class="stat-value">${fmt(totalEarned)}</div><div class="stat-sub">Prihod od popravki</div></div>
@@ -1688,13 +1742,13 @@ ${recent5.length ? `
 <div class="table-wrap desktop-only"><table><thead><tr><th>Slika</th><th>Datum</th><th>Tablica</th><th>Vlasnik</th><th>Opis</th><th>Naplaćeno</th><th>Status</th></tr></thead><tbody>${recent5.map(r => {
                 const thumb = r.images && r.images.length ? r.images[0] : null;
                 return `<tr><td>${thumb ? `<img src="${thumb}" style="width:40px;height:28px;border-radius:4px;object-fit:cover;border:1px solid var(--border)">` : `<div style="width:40px;height:28px;border-radius:4px;background:var(--bg3);display:flex;align-items:center;justify-content:center;border:1px solid var(--border)"><i class="fas fa-car" style="font-size:0.7rem;color:var(--text3)"></i></div>`}</td><td>${fmtDate(r.date)}</td><td><strong>${r.plate || '-'}</strong></td><td>${r.owner || '-'}</td><td>${(r.description || '').substring(0, 30)}</td><td>${fmt(r.charged || 0)}</td><td><span class="badge badge-${r.status === 'done' ? 'green' : r.status === 'active' ? 'yellow' : 'blue'}">${r.status === 'done' ? 'Završeno' : r.status === 'active' ? 'U toku' : 'Čeka'}</span></td></tr>`;
-            }).join('')}</tbody></table></div>` : '<div class="empty-state"><i class="fas fa-wrench"></i><p>Nema popravki. Dodajte prvo vozilo.</p></div>'}
+            }).join('')}</tbody></table></div>` : '<div class="empty-state"><i class="fas fa-wrench"></i><p>Nema popravki za izabrani period.</p></div>'}
 </div>
 <div class="card"><div class="card-title"><i class="fas fa-bell"></i>Nadolazeći Podsjetnici</div>
 ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = new Date(), diff = Math.ceil((d - now) / (1000 * 60 * 60 * 24)); const cls = diff < 0 ? 'urgent' : diff < 7 ? 'soon' : ''; return `<div class="reminder-item ${cls}"><div class="ri-info"><div class="ri-title">${r.title}</div><div class="ri-sub">${r.vehiclePlate || 'Opće'}</div></div><div class="ri-date">${diff < 0 ? 'Isteklo!' : diff === 0 ? 'Danas' : diff + ' dana'}</div></div>` }).join('') : '<div class="empty-state"><i class="fas fa-bell-slash"></i><p>Nema podsjetnika</p></div>'}
 </div></div>
 <div class="card" style="margin-top:20px"><div class="card-title"><i class="fas fa-chart-bar"></i>Mjesečna Zarada (zadnjih 6 mjeseci)</div><div class="chart-container"><canvas id="dashChart"></canvas></div></div>`;
-            renderDashChart(recentRepairs);
+            renderDashChart(allRepairsHistory);
         }
 
         function renderDashChart(repairs) {
@@ -1713,7 +1767,7 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
             const pg = document.getElementById('page-vehicles');
             const vv = localStorage.getItem('vehicleView') || 'list';
             pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-car"></i>Vozila</h2><div style="display:flex;gap:6px;align-items:center">
-<div class="view-toggle"><button id="btnViewList" class="btn btn-sm ${vv==='list'?'btn-primary':'btn-secondary'}" onclick="setVehicleView('list')" title="Lista"><i class="fas fa-list"></i></button><button id="btnViewTile" class="btn btn-sm ${vv==='tile'?'btn-primary':'btn-secondary'}" onclick="setVehicleView('tile')" title="Pločice"><i class="fas fa-th"></i></button></div>
+<div class="view-toggle"><button id="btnViewList" class="btn btn-sm ${vv === 'list' ? 'btn-primary' : 'btn-secondary'}" onclick="setVehicleView('list')" title="Lista"><i class="fas fa-list"></i></button><button id="btnViewTile" class="btn btn-sm ${vv === 'tile' ? 'btn-primary' : 'btn-secondary'}" onclick="setVehicleView('tile')" title="Pločice"><i class="fas fa-th"></i></button></div>
 <button class="btn btn-primary" onclick="openVehicleModal()"><i class="fas fa-plus"></i>Novo Vozilo</button></div></div>
 <div class="search-box"><input class="search-input" id="vSearch" placeholder="Pretraži po tablici, broju registracije ili imenu..." oninput="filterVehicles()"><select class="search-input" style="flex:0 0 180px" id="vSort" onchange="filterVehicles()"><option value="recent">Najnovije</option><option value="name">Po Imenu</option><option value="plate">Po Tablici</option></select></div>
 <div id="vehiclesList">${renderVehicleTable(vehicles)}</div>`;
@@ -1721,8 +1775,8 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
 
         function setVehicleView(v) {
             localStorage.setItem('vehicleView', v);
-            document.getElementById('btnViewList').className = 'btn btn-sm ' + (v==='list'?'btn-primary':'btn-secondary');
-            document.getElementById('btnViewTile').className = 'btn btn-sm ' + (v==='tile'?'btn-primary':'btn-secondary');
+            document.getElementById('btnViewList').className = 'btn btn-sm ' + (v === 'list' ? 'btn-primary' : 'btn-secondary');
+            document.getElementById('btnViewTile').className = 'btn btn-sm ' + (v === 'tile' ? 'btn-primary' : 'btn-secondary');
             filterVehicles();
         }
 
@@ -1824,23 +1878,27 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
 
                 if (v) {
                     const idx = vehicles.findIndex(x => x.id === v.id);
-                    vehicles[idx] = { ...vehicles[idx], plate, owner, make, model,
+                    vehicles[idx] = {
+                        ...vehicles[idx], plate, owner, make, model,
                         regNumber: document.getElementById('fReg').value.trim(),
                         vin: document.getElementById('fVin').value.trim(),
                         phone: document.getElementById('fPhone').value.trim(),
                         year: document.getElementById('fYear').value,
                         km: document.getElementById('fKm').value,
                         notes: document.getElementById('fNotes').value,
-                        images: imgData };
+                        images: imgData
+                    };
                 } else {
-                    vehicles.push({ id: uid(), plate, owner, make, model,
+                    vehicles.push({
+                        id: uid(), plate, owner, make, model,
                         regNumber: document.getElementById('fReg').value.trim(),
                         vin: document.getElementById('fVin').value.trim(),
                         phone: document.getElementById('fPhone').value.trim(),
                         year: document.getElementById('fYear').value,
                         km: document.getElementById('fKm').value,
                         notes: document.getElementById('fNotes').value,
-                        images: imgData, repairs: [], createdAt: Date.now() });
+                        images: imgData, repairs: [], createdAt: Date.now()
+                    });
                 }
                 const savedId = v ? v.id : vehicles[vehicles.length - 1]?.id;
                 saveVehicles(vehicles, savedId ? [savedId] : []);
@@ -1850,7 +1908,7 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
             });
         }
 
-        function deleteVehicle(id) { 
+        function deleteVehicle(id) {
             if (!confirm('Obrisati ovo vozilo i sve popravke? Ova akcija se ne može poništiti!')) return;
             const vehicles = getVehicles().map(v => v.id === id ? null : v).filter(Boolean);
             // Pass id with null images to trigger image doc deletion
@@ -1859,7 +1917,7 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
             // Mark image doc for deletion via queue
             imageSyncQueue[id] = null;
             syncToFirebase();
-            toast('Vozilo obrisano!', 'success'); 
+            toast('Vozilo obrisano!', 'success');
             setTimeout(() => renderVehicles(), 500);
         }
 
@@ -2019,7 +2077,7 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
                 const res = await fetch(compressed);
                 const blob = await res.blob();
                 fileToSend = new File([blob], 'ocr.jpg', { type: 'image/jpeg' });
-                console.log(`OCR image: ${(file.size/1024).toFixed(0)}KB → ${(fileToSend.size/1024).toFixed(0)}KB`);
+                console.log(`OCR image: ${(file.size / 1024).toFixed(0)}KB → ${(fileToSend.size / 1024).toFixed(0)}KB`);
             }
             const form = new FormData();
             form.append('file', fileToSend);
@@ -2053,7 +2111,7 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
                 console.log('OCR raw:', text);
 
                 const parsed = parseRegistrationDoc(text);
-                console.log('OCR parsed:', parsed);                let filled = 0;
+                console.log('OCR parsed:', parsed); let filled = 0;
 
                 // Detect if this looks like a full registration document
                 // (has at least 2 of: VIN, make, year, surname — not just a plate)
@@ -2063,10 +2121,10 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
                 if (isDoc) {
                     // Registration document — fill all available fields
                     if (parsed.plate) { document.getElementById('fPlate').value = parsed.plate; filled++; }
-                    if (parsed.vin)   { document.getElementById('fVin').value = parsed.vin; filled++; }
-                    if (parsed.make)  { document.getElementById('fMake').value = parsed.make; filled++; }
+                    if (parsed.vin) { document.getElementById('fVin').value = parsed.vin; filled++; }
+                    if (parsed.make) { document.getElementById('fMake').value = parsed.make; filled++; }
                     if (parsed.model) { document.getElementById('fModel').value = parsed.model; filled++; }
-                    if (parsed.year)  { document.getElementById('fYear').value = parsed.year; filled++; }
+                    if (parsed.year) { document.getElementById('fYear').value = parsed.year; filled++; }
                     if (parsed.regNumber) { document.getElementById('fReg').value = parsed.regNumber; filled++; }
                     if (parsed.surname || parsed.name) {
                         const fullName = [parsed.surname, parsed.name].filter(Boolean).join(' ');
@@ -2163,11 +2221,11 @@ ${reminders.length ? reminders.map(r => { const d = new Date(r.dueDate), now = n
             const vehicles = getVehicles(); const v = vehicles.find(x => x.id === id);
             if (!v) { renderVehicles(); return }
             const repairs = (v.repairs || []).sort((a, b) => new Date(b.date) - new Date(a.date));
-            const totalCharged    = repairs.reduce((s, r) => s + repairProfit(r).charged, 0);
-            const totalParts      = repairs.reduce((s, r) => s + repairProfit(r).partsCost, 0);
-            const totalPartsProfit= repairs.reduce((s, r) => s + repairProfit(r).partsProfit, 0);
-            const totalLabor      = repairs.reduce((s, r) => s + repairProfit(r).laborCost, 0);
-            const totalVProfit    = totalPartsProfit + totalLabor;
+            const totalCharged = repairs.reduce((s, r) => s + repairProfit(r).charged, 0);
+            const totalParts = repairs.reduce((s, r) => s + repairProfit(r).partsCost, 0);
+            const totalPartsProfit = repairs.reduce((s, r) => s + repairProfit(r).partsProfit, 0);
+            const totalLabor = repairs.reduce((s, r) => s + repairProfit(r).laborCost, 0);
+            const totalVProfit = totalPartsProfit + totalLabor;
             const pg = document.getElementById('page-vehicles');
             const vImages = (v.images || []);
             pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-arrow-left" style="cursor:pointer" onclick="renderVehicles()"></i> Profil Vozila</h2><div class="profile-actions"><button class="btn btn-secondary" onclick="openVehicleModal('${v.id}')"><i class="fas fa-edit"></i>Uredi</button><button class="btn btn-primary" onclick="openRepairModal('${v.id}')"><i class="fas fa-plus"></i>Nova Popravka</button><button class="btn btn-secondary" onclick="openReminderModalForVehicle('${v.id}','${v.plate}')"><i class="fas fa-bell"></i></button><button class="btn btn-danger" onclick="deleteVehicle('${v.id}')"><i class="fas fa-trash"></i></button></div></div>
@@ -2186,9 +2244,9 @@ ${vImages.length ? `<div class="card"><div class="card-title"><i class="fas fa-i
 <div class="card"><div class="card-title"><i class="fas fa-wrench"></i>Historija Popravki</div>
 ${repairs.length ? `
 <div class="mobile-only">${repairs.map(r => {
-    const statusCls = r.status === 'done' ? 'green' : r.status === 'active' ? 'yellow' : 'blue';
-    const statusTxt = r.status === 'done' ? 'Završeno' : r.status === 'active' ? 'U toku' : 'Čeka';
-    return `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:10px">
+                const statusCls = r.status === 'done' ? 'green' : r.status === 'active' ? 'yellow' : 'blue';
+                const statusTxt = r.status === 'done' ? 'Završeno' : r.status === 'active' ? 'U toku' : 'Čeka';
+                return `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
             <div>
                 <div style="font-size:.78rem;color:var(--text3)">${fmtDate(r.date)}</div>
@@ -2202,7 +2260,7 @@ ${repairs.length ? `
             <div style="display:flex;gap:16px;font-size:.82rem;flex-wrap:wrap">
                 <span>Mat: <strong>${fmt(r.partsCost || 0)}</strong></span>
                 <span>Nap: <strong>${fmt(r.charged || 0)}</strong></span>
-                <span style="color:var(--green)">+${fmt((r.charged||0)-(r.partsCost||0))}</span>
+                <span style="color:var(--green)">+${fmt((r.charged || 0) - (r.partsCost || 0))}</span>
             </div>
             <div style="display:flex;gap:6px">
                 <button class="btn btn-sm btn-primary" title="PDF" onclick="openProformaSelectionModal('${v.id}')"><i class="fas fa-file-pdf"></i> PDF</button>
@@ -2211,7 +2269,7 @@ ${repairs.length ? `
             </div>
         </div>
     </div>`;
-}).join('')}</div>
+            }).join('')}</div>
 <div class="table-wrap desktop-only"><table><thead><tr><th>Datum</th><th>Opis</th><th class="hide-md">Radnik</th><th class="hide-md">Materijal</th><th>Cijena Mat.</th><th>Naplaćeno</th><th>Profit</th><th>Status</th><th>Akcije</th></tr></thead><tbody>${repairs.map(r => `<tr><td style="white-space:nowrap">${fmtDate(r.date)}</td><td class="wrap-cell">${r.description || '-'}</td><td class="hide-md">${r.worker || '-'}</td><td class="hide-md wrap-cell">${r.partsUsed || '-'}</td><td style="white-space:nowrap">${fmt(r.partsCost || 0)}</td><td style="white-space:nowrap"><strong>${fmt(r.charged || 0)}</strong></td><td style="white-space:nowrap;color:var(--green)">${fmt((r.charged || 0) - (r.partsCost || 0))}</td><td><span class="badge badge-${r.status === 'done' ? 'green' : r.status === 'active' ? 'yellow' : 'blue'}">${r.status === 'done' ? 'Završeno' : r.status === 'active' ? 'U toku' : 'Čeka'}</span></td><td style="white-space:nowrap"><button class="btn btn-sm btn-primary" title="PDF" onclick="openProformaSelectionModal('${v.id}')"><i class="fas fa-file-pdf"></i></button> <button class="btn btn-sm btn-secondary" onclick="openRepairModal('${v.id}','${r.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-sm btn-danger" onclick="deleteRepair('${v.id}','${r.id}')"><i class="fas fa-trash"></i></button></td></tr>`).join('')}</tbody></table></div>
 ` : '<div class="empty-state"><i class="fas fa-tools"></i><p>Nema popravki za ovo vozilo.</p></div>'}
 </div>`;
@@ -2226,9 +2284,9 @@ ${repairs.length ? `
             // Backwards compat: old records only have partsCost (what customer paid for parts)
             // New records have: partsCharged (customer pays), partsCost (your actual cost after rabat)
             const partsCharged = r ? (r.partsCharged ?? r.partsCost ?? 0) : 0;
-            const partsCost    = r ? (r.partsCost ?? 0) : 0;
-            const hasRabat     = r ? !!r.rabat : true; // default on for new repairs
-            const laborCost    = r ? (r.laborCost ?? Math.max(0, (r.charged||0) - (r.partsCharged ?? r.partsCost ?? 0))) : 0;
+            const partsCost = r ? (r.partsCost ?? 0) : 0;
+            const hasRabat = r ? !!r.rabat : true; // default on for new repairs
+            const laborCost = r ? (r.laborCost ?? Math.max(0, (r.charged || 0) - (r.partsCharged ?? r.partsCost ?? 0))) : 0;
 
             showModal(`${r ? 'Uredi' : 'Nova'} Popravka - ${v.plate}`, `
 <div class="form-group"><label>Datum *</label><input type="date" id="rDate" value="${r ? r.date : new Date().toISOString().split('T')[0]}"></div>
@@ -2253,7 +2311,7 @@ ${repairs.length ? `
 <div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:14px" id="rProfitSummary"></div>
 <div class="form-group"><label>Ukupno naplaćeno klijentu (KM) *</label><input type="number" id="rCharged" value="${r ? r.charged || 0 : 0}" step="0.01" oninput="calcRepairProfit()"></div>
 <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
-  <button type="button" class="btn btn-secondary" style="width:100%" onclick="generateMotorexOrder('${v.make}','${v.model}','${v.vin||''}','${v.year||''}')"><i class="fas fa-truck"></i> Naruči dijelove u Motorexu</button>
+  <button type="button" class="btn btn-secondary" style="width:100%" onclick="generateMotorexOrder('${v.make}','${v.model}','${v.vin || ''}','${v.year || ''}')"><i class="fas fa-truck"></i> Naruči dijelove u Motorexu</button>
   <div id="motorexOrderBox" style="display:none;margin-top:10px">
     <textarea id="motorexOrderText" readonly style="width:100%;min-height:90px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text1);font-size:.9rem;resize:vertical"></textarea>
     <div style="display:flex;gap:8px;margin-top:8px">
@@ -2267,10 +2325,10 @@ ${repairs.length ? `
                 const desc = document.getElementById('rDesc').value.trim();
                 if (!date || !desc) { toast('Popunite datum i opis!', 'error'); return false; }
                 const partsCharged = Number(document.getElementById('rPartsCharged').value) || 0;
-                const partsCost    = Number(document.getElementById('rPartsCost').value) || 0;
-                const laborCost    = Number(document.getElementById('rLaborCost').value) || 0;
-                const charged      = Number(document.getElementById('rCharged').value) || 0;
-                const rabat        = document.getElementById('rRabat').checked;
+                const partsCost = Number(document.getElementById('rPartsCost').value) || 0;
+                const laborCost = Number(document.getElementById('rLaborCost').value) || 0;
+                const charged = Number(document.getElementById('rCharged').value) || 0;
+                const rabat = document.getElementById('rRabat').checked;
                 const repair = {
                     id: r ? r.id : uid(), date, description: desc,
                     worker: document.getElementById('rWorker').value,
@@ -2290,12 +2348,12 @@ ${repairs.length ? `
 
         function calcRepairProfit() {
             const partsCharged = Number(document.getElementById('rPartsCharged')?.value) || 0;
-            const laborCost    = Number(document.getElementById('rLaborCost')?.value) || 0;
-            const rabat        = document.getElementById('rRabat')?.checked;
-            const costEl       = document.getElementById('rPartsCost');
-            const profitEl     = document.getElementById('rPartsProfit');
-            const summaryEl    = document.getElementById('rProfitSummary');
-            const chargedEl    = document.getElementById('rCharged');
+            const laborCost = Number(document.getElementById('rLaborCost')?.value) || 0;
+            const rabat = document.getElementById('rRabat')?.checked;
+            const costEl = document.getElementById('rPartsCost');
+            const profitEl = document.getElementById('rPartsProfit');
+            const summaryEl = document.getElementById('rProfitSummary');
+            const chargedEl = document.getElementById('rCharged');
 
             // Auto-calculate actual parts cost with rabat
             if (rabat && costEl) {
@@ -2308,7 +2366,7 @@ ${repairs.length ? `
                 costEl.style.background = '';
             }
 
-            const partsCost  = Number(costEl?.value) || 0;
+            const partsCost = Number(costEl?.value) || 0;
             const partsProfit = partsCharged - partsCost;
 
             if (profitEl) {
@@ -2374,42 +2432,101 @@ ${repairs.length ? `
             toast('Predložak sačuvan!', 'success');
         }
 
+        // ===== FINANCE PERIOD SYSTEM =====
+        function getActivePeriod() {
+            return localStorage.getItem('ta_finance_period') || 'month';
+        }
+        function setActivePeriod(period) {
+            localStorage.setItem('ta_finance_period', period);
+        }
+        function parseLocalDate(dateStr) {
+            if (!dateStr) return null;
+            const parts = dateStr.split('-');
+            if (parts.length !== 3) return new Date(dateStr);
+            return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        }
+        function isDateInPeriod(dateStr, period) {
+            const d = parseLocalDate(dateStr);
+            if (!d || isNaN(d.getTime())) return false;
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            if (period === 'week') {
+                const currentDay = today.getDay();
+                const distFromMonday = currentDay === 0 ? 6 : currentDay - 1;
+                const startOfWeek = new Date(today);
+                startOfWeek.setDate(today.getDate() - distFromMonday);
+                startOfWeek.setHours(0, 0, 0, 0);
+                const endOfWeek = new Date(startOfWeek);
+                endOfWeek.setDate(startOfWeek.getDate() + 6);
+                endOfWeek.setHours(23, 59, 59, 999);
+                return d >= startOfWeek && d <= endOfWeek;
+            } else if (period === 'month') {
+                return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+            } else if (period === 'year') {
+                return d.getFullYear() === today.getFullYear();
+            }
+            return true; // 'all'
+        }
+        function changeFinancePeriod(period) {
+            setActivePeriod(period);
+            const activeNavItem = document.querySelector('.nav-item.active');
+            if (activeNavItem) {
+                const pageName = activeNavItem.dataset.page;
+                if (pageName === 'dashboard') renderDashboard();
+                else if (pageName === 'finances') renderFinances();
+            }
+        }
+
         // ===== FINANCES =====
         // Helper: compute profit fields from a repair (handles old and new data format)
         function repairProfit(r) {
-            const charged      = Number(r.charged || 0);
+            const charged = Number(r.charged || 0);
             const partsCharged = Number(r.partsCharged ?? r.partsCost ?? 0);
-            const partsCost    = Number(r.partsCost ?? 0);
-            const laborCost    = Number(r.laborCost ?? Math.max(0, charged - partsCharged));
-            const partsProfit  = partsCharged - partsCost;
-            const totalProfit  = partsProfit + laborCost;
+            const partsCost = Number(r.partsCost ?? 0);
+            const laborCost = Number(r.laborCost ?? Math.max(0, charged - partsCharged));
+            const partsProfit = partsCharged - partsCost;
+            const totalProfit = partsProfit + laborCost;
             return { charged, partsCharged, partsCost, laborCost, partsProfit, totalProfit };
         }
 
         function renderFinances() {
+            const period = getActivePeriod();
             const pg = document.getElementById('page-finances');
-            const vehicles = getVehicles(); const expenses = getExpenses();
-            const allRepairs = [];
-            vehicles.forEach(v => (v.repairs || []).forEach(r => allRepairs.push({ ...r, plate: v.plate, owner: v.owner, vid: v.id })));
+            const vehicles = getVehicles(); const allExpenses = getExpenses();
+            
+            const expenses = allExpenses.filter(e => isDateInPeriod(e.date, period));
+            const allRepairsRaw = [];
+            vehicles.forEach(v => (v.repairs || []).forEach(r => allRepairsRaw.push({ ...r, plate: v.plate, owner: v.owner, vid: v.id })));
+            
+            const allRepairs = allRepairsRaw.filter(r => isDateInPeriod(r.date, period));
 
-            const totalEarned     = allRepairs.reduce((s, r) => s + repairProfit(r).charged, 0);
-            const totalPartsCost  = allRepairs.reduce((s, r) => s + repairProfit(r).partsCost, 0);
-            const totalPartsProfit= allRepairs.reduce((s, r) => s + repairProfit(r).partsProfit, 0);
-            const totalLaborProfit= allRepairs.reduce((s, r) => s + repairProfit(r).laborCost, 0);
-            const totalExpenses   = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-            const netProfit       = totalPartsProfit + totalLaborProfit - totalExpenses;
+            const totalEarned = allRepairs.reduce((s, r) => s + repairProfit(r).charged, 0);
+            const totalPartsCost = allRepairs.reduce((s, r) => s + repairProfit(r).partsCost, 0);
+            const totalPartsProfit = allRepairs.reduce((s, r) => s + repairProfit(r).partsProfit, 0);
+            const totalLaborProfit = allRepairs.reduce((s, r) => s + repairProfit(r).laborCost, 0);
+            const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+            const netProfit = totalPartsProfit + totalLaborProfit - totalExpenses;
 
             // Per-vehicle profit summary
             const vehicleRows = vehicles.map(v => {
-                const vRepairs = (v.repairs || []);
+                const vRepairs = (v.repairs || []).filter(r => isDateInPeriod(r.date, period));
                 const vCharged = vRepairs.reduce((s, r) => s + repairProfit(r).charged, 0);
-                const vParts   = vRepairs.reduce((s, r) => s + repairProfit(r).partsProfit, 0);
-                const vLabor   = vRepairs.reduce((s, r) => s + repairProfit(r).laborCost, 0);
-                const vProfit  = vParts + vLabor;
+                const vParts = vRepairs.reduce((s, r) => s + repairProfit(r).partsProfit, 0);
+                const vLabor = vRepairs.reduce((s, r) => s + repairProfit(r).laborCost, 0);
+                const vProfit = vParts + vLabor;
                 return { v, vCharged, vParts, vLabor, vProfit, count: vRepairs.length };
             }).filter(x => x.count > 0).sort((a, b) => b.vProfit - a.vProfit);
 
+            const periodSelectorHtml = `
+<div class="tabs" style="margin-bottom: 24px;">
+    <div class="tab ${period === 'week' ? 'active' : ''}" onclick="changeFinancePeriod('week')">Ova sedmica</div>
+    <div class="tab ${period === 'month' ? 'active' : ''}" onclick="changeFinancePeriod('month')">Ovaj mjesec</div>
+    <div class="tab ${period === 'year' ? 'active' : ''}" onclick="changeFinancePeriod('year')">Ova godina</div>
+    <div class="tab ${period === 'all' ? 'active' : ''}" onclick="changeFinancePeriod('all')">Sve vrijeme</div>
+</div>`;
+
             pg.innerHTML = `<div class="page-header"><h2><i class="fas fa-chart-line"></i>Finansije</h2><button class="btn btn-primary" onclick="openExpenseModal()"><i class="fas fa-plus"></i>Novi Trošak</button></div>
+${periodSelectorHtml}
 <div class="stat-cards">
 <div class="stat-card">
   <div class="stat-label">Ukupni Profit</div>
@@ -2432,7 +2549,7 @@ ${repairs.length ? `
 </div>
 <div class="card"><div class="card-title"><i class="fas fa-car"></i>Profit po Vozilu</div>
 <div class="table-wrap"><table><thead><tr><th>Vozilo</th><th>Vlasnik</th><th>Pop.</th><th>Naplata</th><th>Profit Dijelovi</th><th>Profit Rad</th><th>Ukupni Profit</th></tr></thead><tbody>
-${vehicleRows.map(({v, vCharged, vParts, vLabor, vProfit, count}) => `
+${vehicleRows.map(({ v, vCharged, vParts, vLabor, vProfit, count }) => `
 <tr style="cursor:pointer" onclick="navigate('vehicles','${v.id}')">
   <td><strong>${v.plate}</strong><br><small style="color:var(--text3)">${v.make} ${v.model}</small></td>
   <td>${v.owner}</td>
@@ -2447,7 +2564,7 @@ ${vehicleRows.map(({v, vCharged, vParts, vLabor, vProfit, count}) => `
 <div class="card"><div class="card-title"><i class="fas fa-receipt"></i>Troškovi Radionice</div>
 <div class="search-box"><input class="search-input" id="expSearch" placeholder="Pretraži troškove..." oninput="filterExpenses()"><select class="search-input" style="flex:0 0 160px" id="expCat" onchange="filterExpenses()"><option value="">Sve Kategorije</option><option value="Najam">Najam</option><option value="Struja">Struja</option><option value="Alat">Alat</option><option value="Materijal">Materijal</option><option value="Plata">Plata</option><option value="Ostalo">Ostalo</option></select></div>
 <div id="expensesList">${renderExpenseTable(expenses)}</div></div>`;
-            renderFinanceCharts(allRepairs, expenses);
+            renderFinanceCharts(allRepairs, expenses, allRepairsRaw, allExpenses);
         }
 
         function renderExpenseTable(expenses) {
@@ -2475,7 +2592,7 @@ ${vehicleRows.map(({v, vCharged, vParts, vLabor, vProfit, count}) => `
 
         function deleteExpense(id) { if (!confirm('Obrisati ovaj trošak?')) return; saveExpenses(getExpenses().filter(e => e.id !== id)); toast('Trošak obrisan!'); renderFinances(); }
 
-        function renderFinanceCharts(repairs, expenses) {
+        function renderFinanceCharts(repairs, expenses, allRepairsHistory, allExpensesHistory) {
             const pieCanvas = document.getElementById('finPieChart');
             if (pieCanvas) {
                 const totalPartsProfit = repairs.reduce((s, r) => s + repairProfit(r).partsProfit, 0);
@@ -2487,8 +2604,8 @@ ${vehicleRows.map(({v, vCharged, vParts, vLabor, vProfit, count}) => `
             if (lineCanvas) {
                 const months = []; const now = new Date();
                 for (let i = 5; i >= 0; i--) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); months.push({ label: d.toLocaleDateString('bs-BA', { month: 'short', year: '2-digit' }), m: d.getMonth(), y: d.getFullYear() }); }
-                const profitData = months.map(m => repairs.filter(r => { const d = new Date(r.date); return d.getMonth() === m.m && d.getFullYear() === m.y }).reduce((s, r) => s + repairProfit(r).totalProfit, 0));
-                const expData    = months.map(m => expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === m.m && d.getFullYear() === m.y }).reduce((s, e) => s + Number(e.amount || 0), 0));
+                const profitData = months.map(m => allRepairsHistory.filter(r => { const d = new Date(r.date); return d.getMonth() === m.m && d.getFullYear() === m.y }).reduce((s, r) => s + repairProfit(r).totalProfit, 0));
+                const expData = months.map(m => allExpensesHistory.filter(e => { const d = new Date(e.date); return d.getMonth() === m.m && d.getFullYear() === m.y }).reduce((s, e) => s + Number(e.amount || 0), 0));
                 new Chart(lineCanvas, { type: 'line', data: { labels: months.map(m => m.label), datasets: [{ label: 'Profit', data: profitData, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.1)', fill: true, tension: .4 }, { label: 'Troškovi', data: expData, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.1)', fill: true, tension: .4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,.08)' } }, y: { ticks: { color: '#64748b', callback: v => fmt(v) }, grid: { color: 'rgba(148,163,184,.08)' } } } } });
             }
             const repairCanvas = document.getElementById('finRepairChart');
